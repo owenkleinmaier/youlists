@@ -1,8 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Plus, X } from "lucide-react";
 import { useAI } from "../actions/useAI";
-import ExportToSpotify from "../components/ExportToSpotify";
+import { motion } from "framer-motion";
+import ExportToSpotify from "./ExportToSpotify";
+
+const filterOptions = [
+  "Weather",
+  "Month",
+  "Season",
+  "Mood",
+  "Location",
+  "Setting",
+  "Biome",
+  "Time of Day",
+  "Genre",
+  "Decade",
+  "Year",
+  "Instrument",
+];
 
 interface SpotifyUser {
   display_name: string;
@@ -13,7 +29,10 @@ const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [userInfo, setUserInfo] = useState<SpotifyUser | null>(null);
   const [showLogout, setShowLogout] = useState(false);
-  const { generatePlaylist } = useAI();
+  const [filters, setFilters] = useState(
+    filterOptions.map((option) => ({ type: option, value: "" }))
+  );
+  const [customFilter, setCustomFilter] = useState("");
   const token = localStorage.getItem("spotify_token");
 
   useEffect(() => {
@@ -32,13 +51,29 @@ const HomePage: React.FC = () => {
     navigate("/");
   };
 
-  const handleGeneratePlaylist = async () => {
-    navigate("/loading");
+  const handleFilterChange = (index: number, value: string) => {
+    const updatedFilters = [...filters];
+    updatedFilters[index].value = value;
+    setFilters(updatedFilters);
+  };
+
+  const handleGeneratePlaylist = () => {
+    const prompt = filters
+      .filter((f) => f.value.trim() !== "")
+      .map((f) => `${f.type}: ${f.value}`)
+      .join(", ");
+
+    const fullPrompt = customFilter
+      ? `${prompt}, Custom: ${customFilter}`
+      : prompt;
+
+    navigate("/loading", { state: { prompt: fullPrompt } });
   };
 
   return (
-    <div className="h-screen flex flex-col items-center justify-center bg-gray-900 text-white relative">
+    <div className="h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-6">
       <h1 className="absolute top-6 left-6 text-xl font-bold">YouLists.</h1>
+
       {userInfo && (
         <div className="absolute top-6 right-6 flex flex-col items-end">
           <div
@@ -66,57 +101,82 @@ const HomePage: React.FC = () => {
           )}
         </div>
       )}
-      <div className="bg-green-700 p-10 rounded-2xl shadow-xl w-96 flex flex-col items-center border-2 border-blue-400">
-        <button className="bg-gray-900 text-white w-14 h-14 flex items-center justify-center rounded-full mb-6 shadow-md text-2xl">
-          +
-        </button>
-        <button
-          onClick={handleGeneratePlaylist}
-          className="bg-gray-200 text-black px-6 py-2 rounded-full font-semibold text-lg"
-        >
-          Generate YouList
-        </button>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-2xl">
+        {filters.map((filter, index) => (
+          <div key={index} className="flex flex-col items-start">
+            <span className="text-sm text-gray-300">{filter.type}</span>
+            <input
+              type="text"
+              className="bg-gray-700 text-white px-3 py-1 rounded-md mt-1 w-full"
+              placeholder={`Enter ${filter.type.toLowerCase()}...`}
+              value={filter.value}
+              onChange={(e) => handleFilterChange(index, e.target.value)}
+            />
+          </div>
+        ))}
       </div>
+
+      <div className="mt-4 w-full max-w-md flex flex-col">
+        <label className="text-sm text-gray-300 mb-1">Custom Filter</label>
+        <input
+          type="text"
+          className="bg-gray-700 text-white px-4 py-2 rounded-lg"
+          placeholder="Enter anything..."
+          value={customFilter}
+          onChange={(e) => setCustomFilter(e.target.value)}
+        />
+      </div>
+
+      <button
+        onClick={handleGeneratePlaylist}
+        className="mt-4 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg text-lg shadow-md transition-all duration-200 transform hover:scale-105 active:scale-95"
+      >
+        Generate YouList!
+      </button>
     </div>
   );
 };
 
-const LoadingScreen: React.FC = () => {
+const loadingPhrases = [
+  "Creating a vibe...",
+  "Curating your perfect mix...",
+  "Finding your musical soul...",
+  "Generating the ultimate playlist...",
+  "Bringing your tunes to life...",
+];
+
+export const LoadingScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { generatePlaylist } = useAI();
-  const [playlistData, setPlaylistData] = useState<any | null>(null);
-  const loadingPhrases = [
-    "Creating a vibe...",
-    "Curating your perfect mix...",
-    "Finding your musical soul...",
-    "Generating the ultimate playlist...",
-    "Bringing your tunes to life...",
-  ];
-  const [phrase, setPhrase] = useState(
-    loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)]
-  );
+  const { prompt } = location.state || {};
+  const [phrase, setPhrase] = useState(loadingPhrases[0]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
+    // Shuffle loading phrases every 1.5 seconds
     const interval = setInterval(() => {
       setPhrase(
         loadingPhrases[Math.floor(Math.random() * loadingPhrases.length)]
       );
     }, 1500);
 
+    // Ensure generatePlaylist is only called ONCE
     const fetchPlaylist = async () => {
-      const generatedPlaylist = await generatePlaylist(
-        "chill nighttime",
-        "winter",
-        "60s music"
-      );
-      setPlaylistData(generatedPlaylist);
-      navigate("/playlist", { state: { playlistData: generatedPlaylist } });
+      if (!isGenerating) {
+        setIsGenerating(true);
+        const generatedPlaylist = await generatePlaylist(prompt);
+        navigate("/playlist", { state: { playlistData: generatedPlaylist } });
+      }
     };
 
     fetchPlaylist();
-    return () => clearInterval(interval);
-  }, [navigate, generatePlaylist]);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [navigate, generatePlaylist, prompt, isGenerating]);
 
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
@@ -130,10 +190,15 @@ const LoadingScreen: React.FC = () => {
   );
 };
 
-const PlaylistPage: React.FC = () => {
+export const PlaylistPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { playlistData } = location.state || {};
+  const { playlistData } = location.state || {}; // Get the data from the location state
+
+  // Ensure playlistData is a valid object and has a "playlist" array
+  const playlist = Array.isArray(playlistData?.playlist)
+    ? playlistData.playlist
+    : [];
 
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white p-10">
@@ -146,9 +211,10 @@ const PlaylistPage: React.FC = () => {
       <h1 className="text-3xl font-bold mb-6 text-center">
         Your AI-Generated Playlist
       </h1>
-      {playlistData ? (
+
+      {playlist.length > 0 ? (
         <ul className="space-y-4">
-          {playlistData.playlist.map((track: any, index: number) => (
+          {playlist.map((track: any, index: number) => (
             <li
               key={index}
               className="bg-gray-800 p-4 rounded-lg flex justify-between"
@@ -164,10 +230,10 @@ const PlaylistPage: React.FC = () => {
           No playlist found. Try generating a new one.
         </p>
       )}
-      {playlistData && <ExportToSpotify playlist={playlistData.playlist} />}
+
+      {playlist.length > 0 && <ExportToSpotify playlist={playlist} />}
     </div>
   );
 };
 
 export default HomePage;
-export { LoadingScreen, PlaylistPage };
