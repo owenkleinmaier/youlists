@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Plus, X } from "lucide-react";
 import { useAI } from "../actions/useAI";
 import { motion } from "framer-motion";
 import ExportToSpotify from "./ExportToSpotify";
