@@ -17,12 +17,10 @@ import { motion } from "motion/react";
 export const PlaylistPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { playlistName, currentPlaylist, setCurrentPlaylist } =
-    usePlaylistContext();
+  const { playlistName, currentPlaylist } = usePlaylistContext();
   const { savePlaylist } = usePlaylistHistory();
   const token = localStorage.getItem("spotify_token");
-  const { searchTrackURI, createSpotifyPlaylist, enhancePlaylist } =
-    useSpotify(token);
+  const { searchTrackURI, createSpotifyPlaylist } = useSpotify(token);
 
   // Memoize playlist to prevent unnecessary re-renders
   const playlist = useMemo(() => {
@@ -52,7 +50,7 @@ export const PlaylistPage: React.FC = () => {
       popularity?: number;
     })[]
   >([]);
-  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [, setIsEnhancing] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{
     [key: number]: boolean;
   }>({});

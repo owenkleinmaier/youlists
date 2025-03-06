@@ -22,8 +22,7 @@ interface SpotifyUser {
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setPlaylistName, setSongCount, setAdvancedParameters } =
-    usePlaylistContext();
+  const { setSongCount } = usePlaylistContext();
   const [userInfo, setUserInfo] = useState<SpotifyUser | null>(null);
   const [darkMode, setDarkMode] = useState(true);
   const [songCount, setLocalSongCount] = useState(15);
