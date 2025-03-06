@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { usePlaylistContext, Song } from "../context/PlaylistContext";
 import { usePlaylistHistory } from "../actions/usePlaylistHistory";
@@ -24,6 +24,14 @@ export const PlaylistPage: React.FC = () => {
   const { searchTrackURI, createSpotifyPlaylist, enhancePlaylist } =
     useSpotify(token);
 
+  // Memoize playlist to prevent unnecessary re-renders
+  const playlist = useMemo(() => {
+    const playlistData = location.state?.playlistData || {
+      playlist: currentPlaylist,
+    };
+    return Array.isArray(playlistData?.playlist) ? playlistData.playlist : [];
+  }, [location.state, currentPlaylist]);
+
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportedPlaylistURL, setExportedPlaylistURL] = useState<string | null>(
@@ -34,6 +42,8 @@ export const PlaylistPage: React.FC = () => {
     playlistName || "AI-Generated Playlist"
   );
   const [editingName, setEditingName] = useState(false);
+
+  // Enhanced playlist state and loading states
   const [enhancedPlaylist, setEnhancedPlaylist] = useState<
     (Song & {
       uri?: string;
@@ -47,15 +57,7 @@ export const PlaylistPage: React.FC = () => {
     [key: number]: boolean;
   }>({});
 
-  // If navigating directly to this page without data, get playlist from context
-  const playlistData = location.state?.playlistData || {
-    playlist: currentPlaylist || [],
-  };
-  const playlist = Array.isArray(playlistData?.playlist)
-    ? playlistData.playlist
-    : [];
-
-  // Handle image loading state
+  // Memoized image loading handlers
   const handleImageLoad = useCallback((index: number) => {
     setLoadingImages((prev) => ({ ...prev, [index]: false }));
   }, []);
@@ -64,15 +66,70 @@ export const PlaylistPage: React.FC = () => {
     setLoadingImages((prev) => ({ ...prev, [index]: false }));
   }, []);
 
-  useEffect(() => {
-    // Update context with current playlist if coming from location state
-    if (
-      location.state?.playlistData &&
-      Array.isArray(location.state.playlistData.playlist)
-    ) {
-      setCurrentPlaylist(location.state.playlistData.playlist);
-    }
+  // Memoized enhancePlaylist function
+  const memoizedEnhancePlaylist = useCallback(
+    async (tracks: Song[]) => {
+      if (tracks.length === 0 || !token) return tracks;
 
+      setIsEnhancing(true);
+      try {
+        const batchSize = 3;
+        let enhancedResults: any[] = [];
+
+        for (let i = 0; i < tracks.length; i += batchSize) {
+          const batch = tracks.slice(i, i + batchSize);
+
+          // Add error handling for each batch
+          const enhancedBatch = await Promise.all(
+            batch.map(async (song) => {
+              try {
+                const uri = await searchTrackURI(song.title, song.artist);
+                if (uri) {
+                  const details = await fetch(
+                    `https://api.spotify.com/v1/tracks/${uri.split(":")[2]}`,
+                    {
+                      headers: { Authorization: `Bearer ${token}` },
+                    }
+                  );
+
+                  if (!details.ok) return song;
+
+                  const trackDetails = await details.json();
+                  return {
+                    ...song,
+                    uri,
+                    coverUrl: trackDetails.album.images[0]?.url,
+                    previewUrl: trackDetails.preview_url,
+                    popularity: trackDetails.popularity,
+                  };
+                }
+                return song;
+              } catch (error) {
+                console.error(`Error enhancing track ${song.title}:`, error);
+                return song;
+              }
+            })
+          );
+
+          enhancedResults = [...enhancedResults, ...enhancedBatch];
+
+          // Add a small delay to prevent rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+
+        return enhancedResults;
+      } catch (error) {
+        console.error("Error enhancing playlist:", error);
+        return tracks;
+      } finally {
+        setIsEnhancing(false);
+      }
+    },
+    [token, searchTrackURI]
+  );
+
+  // Playlist enhancement effect
+  useEffect(() => {
     // Initialize loading state for all images
     const initialLoadingState: { [key: number]: boolean } = {};
     playlist.forEach((_: any, index: number) => {
@@ -80,38 +137,24 @@ export const PlaylistPage: React.FC = () => {
     });
     setLoadingImages(initialLoadingState);
 
-    // Enhance playlist with Spotify data (cover art, preview URLs, etc.)
-    const fetchEnhancedPlaylist = async () => {
-      if (playlist.length > 0 && token) {
-        setIsEnhancing(true);
+    // Separate async function to handle enhancement
+    const enhancePlaylistSafely = async () => {
+      if (playlist.length > 0) {
         try {
-          // Process tracks in smaller batches to avoid overwhelming the browser
-          const batchSize = 5;
-          let enhancedResults: any[] = [];
-
-          for (let i = 0; i < playlist.length; i += batchSize) {
-            const batch = playlist.slice(i, i + batchSize);
-            const enhancedBatch = await enhancePlaylist(batch);
-            enhancedResults = [...enhancedResults, ...enhancedBatch];
-
-            // Artificial delay to prevent rate limiting and give UI time to breathe
-            if (i + batchSize < playlist.length) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-          }
-
-          setEnhancedPlaylist(enhancedResults);
+          const enhanced = await memoizedEnhancePlaylist(playlist);
+          setEnhancedPlaylist(enhanced);
         } catch (error) {
-          console.error("Error enhancing playlist:", error);
-        } finally {
-          setIsEnhancing(false);
+          console.error("Playlist enhancement failed:", error);
+          setEnhancedPlaylist(playlist);
         }
       }
     };
 
-    fetchEnhancedPlaylist();
-  }, [location.state, setCurrentPlaylist, playlist, token, enhancePlaylist]);
+    // Call the async function
+    enhancePlaylistSafely();
+  }, [playlist, memoizedEnhancePlaylist]);
 
+  // Export to Spotify handler
   const handleExportToSpotify = async () => {
     if (!playlist.length) {
       alert("No songs to export!");
@@ -157,6 +200,7 @@ export const PlaylistPage: React.FC = () => {
     }
   };
 
+  // Save to history handler
   const handleSaveToHistory = () => {
     savePlaylist(customPlaylistName, playlist);
     setSavedToHistory(true);
@@ -167,6 +211,7 @@ export const PlaylistPage: React.FC = () => {
     }, 3000);
   };
 
+  // Share handler
   const handleShare = () => {
     if (navigator.share) {
       navigator
@@ -185,6 +230,7 @@ export const PlaylistPage: React.FC = () => {
     }
   };
 
+  // Open Spotify search for a track
   const openSpotifySearch = (song: Song) => {
     const query = `${song.title} ${song.artist}`;
     window.open(

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Song } from "../context/PlaylistContext";
 
 const SPOTIFY_API_URL = "https://api.spotify.com/v1";
@@ -20,221 +20,216 @@ export const useSpotify = (token: string | null) => {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Search for a track on Spotify and return its URI
+   * Search for a track on Spotify and return its URI.
    */
-  const searchTrackURI = async (trackName: string, artistName: string): Promise<string | null> => {
-    if (!token) {
-      console.error("❌ Missing Spotify Token!");
-      return null;
-    }
-
-    try {
-      // Use a more targeted search query for better results
-      const query = `track:"${trackName.replace(/"/g, '')}" artist:"${artistName.replace(/"/g, '')}"`;
-      
-      const response = await fetch(
-        `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(query)}&type=track&limit=5`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`❌ Spotify search failed: ${await response.text()}`);
+  const searchTrackURI = useCallback(
+    async (trackName: string, artistName: string): Promise<string | null> => {
+      if (!token) {
+        console.error("❌ Missing Spotify Token!");
+        return null;
       }
-
-      const data = await response.json();
-      const tracks = data.tracks.items;
-      
-      if (tracks.length === 0) {
-        // Try a more relaxed search query
-        const relaxedQuery = `${trackName} ${artistName}`;
-        const fallbackResponse = await fetch(
-          `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(relaxedQuery)}&type=track&limit=3`,
+      try {
+        const query = `track:"${trackName.replace(/"/g, "")}" artist:"${artistName.replace(/"/g, "")}"`;
+        const response = await fetch(
+          `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(query)}&type=track&limit=5`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-        
-        if (!fallbackResponse.ok) {
-          return null;
+
+        if (!response.ok) {
+          throw new Error(`❌ Spotify search failed: ${await response.text()}`);
         }
-        
-        const fallbackData = await fallbackResponse.json();
-        return fallbackData.tracks.items[0]?.uri || null;
+
+        const data = await response.json();
+        const tracks = data.tracks.items;
+
+        if (tracks.length === 0) {
+          // Try a more relaxed search query
+          const relaxedQuery = `${trackName} ${artistName}`;
+          const fallbackResponse = await fetch(
+            `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(relaxedQuery)}&type=track&limit=3`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+
+          if (!fallbackResponse.ok) {
+            return null;
+          }
+
+          const fallbackData = await fallbackResponse.json();
+          return fallbackData.tracks.items[0]?.uri || null;
+        }
+
+        // Find the best match by comparing track name and artist name
+        const bestMatch = tracks.reduce((best: SpotifyTrack | null, current: SpotifyTrack) => {
+          const hasMatchingArtist = current.artists.some(artist =>
+            artist.name.toLowerCase().includes(artistName.toLowerCase()) ||
+            artistName.toLowerCase().includes(artist.name.toLowerCase())
+          );
+
+          const trackNameMatch =
+            current.name.toLowerCase().includes(trackName.toLowerCase()) ||
+            trackName.toLowerCase().includes(current.name.toLowerCase());
+
+          if (!best || (hasMatchingArtist && trackNameMatch)) {
+            return current;
+          }
+          return best;
+        }, null);
+
+        return bestMatch?.uri || tracks[0]?.uri || null;
+      } catch (error) {
+        console.error("❌ Error searching for track:", error);
+        return null;
       }
-
-      // Find the best match by comparing track name and artist name
-      const bestMatch = tracks.reduce((best: SpotifyTrack | null, current: SpotifyTrack) => {
-        // Check if artist name is in the current track's artists
-        const hasMatchingArtist = current.artists.some(artist => 
-          artist.name.toLowerCase().includes(artistName.toLowerCase()) || 
-          artistName.toLowerCase().includes(artist.name.toLowerCase())
-        );
-
-        // Check if track names match (ignoring case)
-        const trackNameMatch = current.name.toLowerCase().includes(trackName.toLowerCase()) || 
-                               trackName.toLowerCase().includes(current.name.toLowerCase());
-
-        // If we don't have a best match yet, or this is a better match
-        if (!best || (hasMatchingArtist && trackNameMatch)) {
-          return current;
-        }
-        
-        return best;
-      }, null);
-
-      return bestMatch?.uri || tracks[0]?.uri || null;
-    } catch (error) {
-      console.error("❌ Error searching for track:", error);
-      return null;
-    }
-  };
+    },
+    [token]
+  );
 
   /**
-   * Fetch track details from Spotify
+   * Fetch track details from Spotify.
    */
-  const getTrackDetails = async (trackURI: string): Promise<SpotifyTrack | null> => {
-    if (!token) return null;
-    
-    try {
-      const trackId = trackURI.split(':').pop();
-      const response = await fetch(`${SPOTIFY_API_URL}/tracks/${trackId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!response.ok) return null;
-      
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching track details:", error);
-      return null;
-    }
-  };
+  const getTrackDetails = useCallback(
+    async (trackURI: string): Promise<SpotifyTrack | null> => {
+      if (!token) return null;
+      try {
+        const trackId = trackURI.split(":").pop();
+        const response = await fetch(`${SPOTIFY_API_URL}/tracks/${trackId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return null;
+        return await response.json();
+      } catch (error) {
+        console.error("Error fetching track details:", error);
+        return null;
+      }
+    },
+    [token]
+  );
 
   /**
-   * Create a Spotify playlist and add tracks to it
+   * Create a Spotify playlist and add tracks to it.
    */
-  const createSpotifyPlaylist = async (
-    playlistName: string, 
-    trackURIs: string[],
-    description = "Generated by YouLists AI"
-  ): Promise<string | null> => {
-    if (!token) {
-      console.error("❌ Missing Spotify Token!");
-      setError("Missing Spotify authentication.");
-      return null;
-    }
-
-    if (trackURIs.length === 0) {
-      setError("No tracks found to add to playlist.");
-      return null;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Step 1: Get user ID
-      const userResponse = await fetch(`${SPOTIFY_API_URL}/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (!userResponse.ok) {
-        throw new Error(`Failed to get user info: ${await userResponse.text()}`);
-      }
-      
-      const userData = await userResponse.json();
-      const userId = userData.id;
-      
-      // Step 2: Create an empty playlist
-      const createPlaylistResponse = await fetch(`${SPOTIFY_API_URL}/users/${userId}/playlists`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: playlistName,
-          description: description,
-          public: false,
-        }),
-      });
-
-      if (!createPlaylistResponse.ok) {
-        throw new Error(`Failed to create playlist: ${await createPlaylistResponse.text()}`);
+  const createSpotifyPlaylist = useCallback(
+    async (playlistName: string, trackURIs: string[], description = "Generated by YouLists AI"): Promise<string | null> => {
+      if (!token) {
+        console.error("❌ Missing Spotify Token!");
+        setError("Missing Spotify authentication.");
+        return null;
       }
 
-      const playlistData = await createPlaylistResponse.json();
-      const playlistId = playlistData.id;
+      if (trackURIs.length === 0) {
+        setError("No tracks found to add to playlist.");
+        return null;
+      }
 
-      // Step 3: Add songs to the playlist (in batches of 100 to respect API limits)
-      const batchSize = 100;
-      for (let i = 0; i < trackURIs.length; i += batchSize) {
-        const batch = trackURIs.slice(i, i + batchSize);
-        
-        const addTracksResponse = await fetch(`${SPOTIFY_API_URL}/playlists/${playlistId}/tracks`, {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Get user ID
+        const userResponse = await fetch(`${SPOTIFY_API_URL}/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!userResponse.ok) {
+          throw new Error(`Failed to get user info: ${await userResponse.text()}`);
+        }
+        const userData = await userResponse.json();
+        const userId = userData.id;
+
+        // Create an empty playlist
+        const createPlaylistResponse = await fetch(`${SPOTIFY_API_URL}/users/${userId}/playlists`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ uris: batch }),
+          body: JSON.stringify({
+            name: playlistName,
+            description: description,
+            public: false,
+          }),
         });
-        
-        if (!addTracksResponse.ok) {
-          console.error(`Error adding tracks batch ${i/batchSize + 1}: ${await addTracksResponse.text()}`);
-        }
-      }
 
-      return playlistData.external_urls.spotify;
-    } catch (error) {
-      console.error("❌ Error creating Spotify playlist:", error);
-      setError(error instanceof Error ? error.message : "Unknown error occurred");
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        if (!createPlaylistResponse.ok) {
+          throw new Error(`Failed to create playlist: ${await createPlaylistResponse.text()}`);
+        }
+
+        const playlistData = await createPlaylistResponse.json();
+        const playlistId = playlistData.id;
+
+        // Add songs to the playlist in batches
+        const batchSize = 100;
+        for (let i = 0; i < trackURIs.length; i += batchSize) {
+          const batch = trackURIs.slice(i, i + batchSize);
+          const addTracksResponse = await fetch(`${SPOTIFY_API_URL}/playlists/${playlistId}/tracks`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ uris: batch }),
+          });
+          if (!addTracksResponse.ok) {
+            console.error(`Error adding tracks batch ${i / batchSize + 1}: ${await addTracksResponse.text()}`);
+          }
+        }
+
+        return playlistData.external_urls.spotify;
+      } catch (error) {
+        console.error("❌ Error creating Spotify playlist:", error);
+        setError(error instanceof Error ? error.message : "Unknown error occurred");
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [token]
+  );
 
   /**
-   * Enhance a playlist with Spotify data (cover art, preview URLs, etc.)
+   * Enhance a playlist with Spotify data.
    */
-  const enhancePlaylist = async (playlist: Song[]): Promise<Song[]> => {
-    if (!token || playlist.length === 0) {
-      return playlist;
-    }
+  const enhancePlaylist = useCallback(
+    async (playlist: Song[]): Promise<Song[]> => {
+      if (!token || playlist.length === 0) {
+        return playlist;
+      }
 
-    const enhanced = await Promise.all(
-      playlist.map(async (song) => {
-        try {
-          const uri = await searchTrackURI(song.title, song.artist);
-          if (uri) {
-            const details = await getTrackDetails(uri);
-            return {
-              ...song,
-              uri,
-              coverUrl: details?.album.images[0]?.url,
-              previewUrl: details?.preview_url,
-              popularity: details?.popularity,
-            };
+      const enhanced = await Promise.all(
+        playlist.map(async (song) => {
+          try {
+            const uri = await searchTrackURI(song.title, song.artist);
+            if (uri) {
+              const details = await getTrackDetails(uri);
+              return {
+                ...song,
+                uri,
+                coverUrl: details?.album.images[0]?.url,
+                previewUrl: details?.preview_url,
+                popularity: details?.popularity,
+              };
+            }
+            return song;
+          } catch (e) {
+            return song;
           }
-          return song;
-        } catch (e) {
-          return song;
-        }
-      })
-    );
+        })
+      );
 
-    return enhanced;
-  };
+      return enhanced;
+    },
+    [token, searchTrackURI, getTrackDetails]
+  );
 
-  return { 
-    searchTrackURI, 
-    getTrackDetails, 
-    createSpotifyPlaylist, 
+  return {
+    searchTrackURI,
+    getTrackDetails,
+    createSpotifyPlaylist,
     enhancePlaylist,
-    isLoading, 
-    error 
+    isLoading,
+    error,
   };
 };

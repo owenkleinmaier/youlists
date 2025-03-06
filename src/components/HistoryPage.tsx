@@ -57,7 +57,7 @@ const HistoryPage: React.FC = () => {
           </p>
         </div>
 
-        {history.length > 0 ? (
+        {Array.isArray(history) && history.length > 0 ? (
           <div className="space-y-4">
             {history.map((playlist, index) => (
               <motion.div
@@ -71,8 +71,10 @@ const HistoryPage: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-lg">{playlist.name}</h3>
                     <p className="text-sm text-gray-400">
-                      {playlist.tracks.length} tracks • Created{" "}
-                      {formatDate(playlist.createdAt)}
+                      {playlist.tracks?.length || 0} tracks • Created{" "}
+                      {playlist.createdAt
+                        ? formatDate(playlist.createdAt)
+                        : "Unknown"}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -82,7 +84,6 @@ const HistoryPage: React.FC = () => {
                         <button
                           onClick={() => {
                             // Implement delete functionality here
-                            // For now, we'll just remove the confirmation
                             setDeleteConfirmIndex(null);
                           }}
                           className="p-2 bg-red-600 rounded-lg hover:bg-red-700"
@@ -116,20 +117,19 @@ const HistoryPage: React.FC = () => {
                     )}
                   </div>
                 </div>
-
                 {/* Preview of tracks */}
                 <div className="px-4 pb-4">
                   <div className="text-sm text-gray-400 mb-2">Preview:</div>
                   <div className="text-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
                     {playlist.tracks
-                      .slice(0, 6)
+                      ?.slice(0, 6)
                       .map((track: any, i: number) => (
                         <div key={i} className="truncate">
                           {track.title} -{" "}
                           <span className="text-gray-400">{track.artist}</span>
                         </div>
                       ))}
-                    {playlist.tracks.length > 6 && (
+                    {playlist.tracks && playlist.tracks.length > 6 && (
                       <div className="text-gray-500">
                         +{playlist.tracks.length - 6} more...
                       </div>
