@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # YouLists - AI-Powered Spotify Playlist Generator
 
 YouLists is a web application that leverages AI to generate personalized music playlists based on your mood, activity, or vibe, and exports them directly to Spotify.
