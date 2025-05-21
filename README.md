@@ -148,6 +148,3 @@ TailwindCSS
 Lucide Icons
 Framer Motion
 
-
-Made with ❤️ by Owen Kleinmaier
->>>>>>> ac4212bfe133f34d0b1561cfb58869a1ebca1124
