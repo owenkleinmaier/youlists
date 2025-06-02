@@ -41,7 +41,7 @@ export const PlaylistPage: React.FC = () => {
   );
   const [editingName, setEditingName] = useState(false);
 
-  // Enhanced playlist state and loading states
+  // Enhance playlist state and loading states
   const [enhancedPlaylist, setEnhancedPlaylist] = useState<
     (Song & {
       uri?: string;
