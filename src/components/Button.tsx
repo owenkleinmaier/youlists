@@ -18,6 +18,7 @@ export interface ButtonProps {
   target?: string;
   rel?: string;
   className?: string;
+  style?: React.CSSProperties;
   disabled?: boolean;
   onClick?: (() => void) | ((e: React.MouseEvent) => void);
   "aria-label"?: string;
@@ -36,6 +37,7 @@ const Button: React.FC<ButtonProps> = ({
   animate = true,
   tooltip,
   className = "",
+  style,
   disabled,
   children,
   href,
@@ -181,7 +183,7 @@ const Button: React.FC<ButtonProps> = ({
 
   const elementProps = {
     className: combinedClasses,
-    style: { ...variantStyle, ...hoverStyles },
+    style: { ...variantStyle, ...hoverStyles, ...style },
     "aria-label": tooltip || ariaLabel,
     title: title,
     onClick: onClick,
