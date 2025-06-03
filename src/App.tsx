@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { PlaylistProvider } from "./context/PlaylistContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import LoginPage from "./components/LoginPage";
 import HomePage from "./components/HomePage";
 import PlaylistPage from "./components/PlaylistPage";
@@ -9,18 +10,20 @@ import SettingsPage from "./components/SettingsPage";
 
 function App() {
   return (
-    <PlaylistProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LoginPage />} />
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/playlist" element={<PlaylistPage />} />
-          <Route path="/loading" element={<LoadingScreen />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Routes>
-      </Router>
-    </PlaylistProvider>
+    <ThemeProvider>
+      <PlaylistProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<LoginPage />} />
+            <Route path="/home" element={<HomePage />} />
+            <Route path="/playlist" element={<PlaylistPage />} />
+            <Route path="/loading" element={<LoadingScreen />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Routes>
+        </Router>
+      </PlaylistProvider>
+    </ThemeProvider>
   );
 }
 

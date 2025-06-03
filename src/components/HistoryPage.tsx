@@ -2,13 +2,16 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePlaylistHistory } from "../actions/usePlaylistHistory";
 import { usePlaylistContext } from "../context/PlaylistContext";
-import { ArrowLeft, Clock, Trash2, Play } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
+import { ArrowLeft, Clock, Trash2, Play, Sun, Moon } from "lucide-react";
 import { motion } from "motion/react";
+import Button from "./Button";
 
 const HistoryPage: React.FC = () => {
   const navigate = useNavigate();
   const { history } = usePlaylistHistory();
   const { setCurrentPlaylist, setPlaylistName } = usePlaylistContext();
+  const { theme, colors, toggleTheme } = useTheme();
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(
     null
   );
@@ -31,28 +34,55 @@ const HistoryPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+    <div 
+      className="min-h-screen"
+      style={{
+        background: `linear-gradient(135deg, ${colors.bg.primary}, ${colors.bg.secondary})`,
+        color: colors.text.primary
+      }}
+    >
       {/* Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-md bg-black/60 border-b border-gray-800">
+      <header 
+        className="sticky top-0 z-10 backdrop-blur-md border-b"
+        style={{
+          background: `${colors.bg.overlay}60`,
+          borderColor: colors.border.primary
+        }}
+      >
         <div className="max-w-5xl mx-auto p-4 flex justify-between items-center">
-          <button
+          <Button
             onClick={() => navigate("/home")}
-            className="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-gray-800"
+            variant="ghost"
+            size="md"
+            icon={<ArrowLeft size={16} />}
+            tooltip="Return to home page"
           >
-            <ArrowLeft size={16} />
-            <span>Back to Home</span>
-          </button>
+            Back to Home
+          </Button>
+          <Button
+            onClick={toggleTheme}
+            variant="icon"
+            size="md"
+            icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            tooltip={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          />
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto p-4 md:p-6">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <h1 
+            className="text-2xl font-bold flex items-center gap-2"
+            style={{ color: colors.text.primary }}
+          >
             <Clock size={24} />
             Playlist History
           </h1>
-          <p className="text-gray-400 mt-1">
+          <p 
+            className="mt-1"
+            style={{ color: colors.text.secondary }}
+          >
             Your previously generated playlists
           </p>
         </div>
@@ -65,12 +95,25 @@ const HistoryPage: React.FC = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-gray-800/50 rounded-xl overflow-hidden"
+                className="rounded-xl overflow-hidden backdrop-blur-sm border"
+                style={{
+                  background: `${colors.bg.elevated}80`,
+                  borderColor: colors.border.primary,
+                  boxShadow: `0 8px 32px ${colors.bg.overlay}20`
+                }}
               >
                 <div className="p-4 flex justify-between items-center">
                   <div>
-                    <h3 className="font-medium text-lg">{playlist.name}</h3>
-                    <p className="text-sm text-gray-400">
+                    <h3 
+                      className="font-medium text-lg"
+                      style={{ color: colors.text.primary }}
+                    >
+                      {playlist.name}
+                    </h3>
+                    <p 
+                      className="text-sm"
+                      style={{ color: colors.text.secondary }}
+                    >
                       {playlist.tracks?.length || 0} tracks • Created{" "}
                       {playlist.createdAt
                         ? formatDate(playlist.createdAt)
@@ -80,57 +123,77 @@ const HistoryPage: React.FC = () => {
                   <div className="flex gap-2">
                     {deleteConfirmIndex === index ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-300">Confirm?</span>
-                        <button
+                        <span 
+                          className="text-sm"
+                          style={{ color: colors.text.secondary }}
+                        >
+                          Confirm?
+                        </span>
+                        <Button
                           onClick={() => {
                             // Implement delete functionality here
                             setDeleteConfirmIndex(null);
                           }}
-                          className="p-2 bg-red-600 rounded-lg hover:bg-red-700"
+                          variant="danger"
+                          size="sm"
+                          tooltip="Confirm deletion"
                         >
                           Yes
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => setDeleteConfirmIndex(null)}
-                          className="p-2 bg-gray-700 rounded-lg hover:bg-gray-600"
+                          variant="secondary"
+                          size="sm"
+                          tooltip="Cancel deletion"
                         >
                           No
-                        </button>
+                        </Button>
                       </div>
                     ) : (
                       <>
-                        <button
+                        <Button
                           onClick={() => loadPlaylist(playlist)}
-                          className="p-2 rounded-lg bg-green-600 hover:bg-green-700"
-                          title="Load playlist"
-                        >
-                          <Play size={18} />
-                        </button>
-                        <button
+                          variant="success"
+                          size="md"
+                          icon={<Play size={18} />}
+                          tooltip="Load playlist"
+                        />
+                        <Button
                           onClick={() => setDeleteConfirmIndex(index)}
-                          className="p-2 rounded-lg hover:bg-gray-700"
-                          title="Delete playlist"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                          variant="ghost"
+                          size="md"
+                          icon={<Trash2 size={18} />}
+                          tooltip="Delete playlist"
+                        />
                       </>
                     )}
                   </div>
                 </div>
                 {/* Preview of tracks */}
                 <div className="px-4 pb-4">
-                  <div className="text-sm text-gray-400 mb-2">Preview:</div>
+                  <div 
+                    className="text-sm mb-2"
+                    style={{ color: colors.text.secondary }}
+                  >
+                    Preview:
+                  </div>
                   <div className="text-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
                     {playlist.tracks
                       ?.slice(0, 6)
                       .map((track: any, i: number) => (
-                        <div key={i} className="truncate">
+                        <div 
+                          key={i} 
+                          className="truncate"
+                          style={{ color: colors.text.primary }}
+                        >
                           {track.title} -{" "}
-                          <span className="text-gray-400">{track.artist}</span>
+                          <span style={{ color: colors.text.secondary }}>
+                            {track.artist}
+                          </span>
                         </div>
                       ))}
                     {playlist.tracks && playlist.tracks.length > 6 && (
-                      <div className="text-gray-500">
+                      <div style={{ color: colors.text.tertiary }}>
                         +{playlist.tracks.length - 6} more...
                       </div>
                     )}
@@ -140,15 +203,25 @@ const HistoryPage: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-gray-400 bg-gray-800/30 rounded-xl">
+          <div 
+            className="text-center py-12 rounded-xl backdrop-blur-sm border"
+            style={{
+              background: `${colors.bg.elevated}50`,
+              borderColor: colors.border.primary,
+              color: colors.text.secondary
+            }}
+          >
             <Clock size={48} className="mx-auto mb-4 opacity-50" />
             <p>Your playlist history is empty.</p>
-            <button
+            <Button
               onClick={() => navigate("/home")}
-              className="mt-4 px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700"
+              variant="primary"
+              size="lg"
+              className="mt-4"
+              tooltip="Start creating playlists"
             >
               Create Your First Playlist
-            </button>
+            </Button>
           </div>
         )}
       </main>

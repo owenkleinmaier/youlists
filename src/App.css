@@ -21,9 +21,20 @@ body {
   background: linear-gradient(to bottom, #1a1a1a, #000);
 }
 
-/* Universal Button Styling */
+/* Universal Button Reset - Remove browser defaults */
 button {
   all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  font-family: inherit;
+}
+
+/* Specific styling for Spotify login buttons only */
+.spotify-login-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -34,11 +45,32 @@ button {
   border-radius: 8px;
   background: linear-gradient(135deg, #1db954, #1ed760);
   transition: all 0.3s ease-in-out;
+  color: white;
 }
 
-button:hover {
+.spotify-login-button:hover {
   transform: scale(1.05);
   opacity: 0.9;
+}
+
+/* Theme selector buttons - specific styling */
+.theme-button {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform 0.3s ease;
+  background: none;
+  padding: 0;
+}
+
+.theme-button:hover {
+  transform: scale(1.15);
+}
+
+.theme-button.selected {
+  border-color: #1db954;
 }
 
 /* Container for homepage and settings */
@@ -71,23 +103,6 @@ button:hover {
   justify-content: center;
 }
 
-.theme-button {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  cursor: pointer;
-  border: 3px solid transparent;
-  transition: transform 0.3s ease;
-}
-
-.theme-button:hover {
-  transform: scale(1.15);
-}
-
-.theme-button.selected {
-  border-color: #1db954;
-}
-
 /* Settings UI */
 .settings-panel {
   background: rgba(255, 255, 255, 0.1);
@@ -114,7 +129,7 @@ button:hover {
     padding: 1rem;
   }
   
-  button {
+  .spotify-login-button {
     padding: 0.6rem 1rem;
   }
 

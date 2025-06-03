@@ -11,8 +11,12 @@ import {
   Disc,
   Music,
   ExternalLink,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { motion } from "motion/react";
+import Button from "./Button";
+import { useTheme } from "../context/ThemeContext";
 
 export const PlaylistPage: React.FC = () => {
   const navigate = useNavigate();
@@ -21,6 +25,7 @@ export const PlaylistPage: React.FC = () => {
   const { savePlaylist } = usePlaylistHistory();
   const token = localStorage.getItem("spotify_token");
   const { searchTrackURI, createSpotifyPlaylist } = useSpotify(token);
+  const { theme, colors, toggleTheme } = useTheme();
 
   // Memoize playlist to prevent unnecessary re-renders
   const playlist = useMemo(() => {
@@ -238,37 +243,58 @@ export const PlaylistPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+    <div 
+      className="min-h-screen transition-all duration-300"
+      style={{
+        background: `linear-gradient(135deg, ${colors.bg.primary} 0%, ${colors.bg.secondary} 50%, ${colors.bg.tertiary} 100%)`,
+        color: colors.text.primary
+      }}
+    >
       {/* Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-md bg-black/60 border-b border-gray-800">
+      <header 
+        className="sticky top-0 z-10 backdrop-blur-xl border-b transition-all duration-300"
+        style={{
+          backgroundColor: `${colors.bg.elevated}95`,
+          borderColor: colors.border.primary,
+          boxShadow: `0 8px 32px ${colors.bg.overlay}20`
+        }}
+      >
         <div className="max-w-5xl mx-auto p-4 flex justify-between items-center">
-          <button
+          <Button
             onClick={() => navigate("/home")}
-            className="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-gray-800"
+            variant="ghost"
+            size="md"
+            icon={<ArrowLeft size={16} />}
+            tooltip="Return to home page"
           >
-            <ArrowLeft size={16} />
-            <span>Back</span>
-          </button>
+            Back
+          </Button>
 
           <div className="flex gap-2">
-            <button
+            <Button
+              onClick={toggleTheme}
+              variant="icon"
+              size="md"
+              icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              tooltip={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            />
+            
+            <Button
               onClick={handleSaveToHistory}
               disabled={savedToHistory}
-              className={`p-2 rounded-lg ${
-                savedToHistory ? "bg-green-700 text-white" : "hover:bg-gray-800"
-              }`}
-              title="Save to history"
-            >
-              {savedToHistory ? "Saved!" : <Save size={18} />}
-            </button>
+              variant={savedToHistory ? "success" : "icon"}
+              size="md"
+              icon={savedToHistory ? <Save size={18} /> : <Save size={18} />}
+              tooltip={savedToHistory ? "Saved to history!" : "Save to history"}
+            />
 
-            <button
+            <Button
               onClick={handleShare}
-              className="p-2 rounded-lg hover:bg-gray-800"
-              title="Share playlist"
-            >
-              <Share2 size={18} />
-            </button>
+              variant="icon"
+              size="md"
+              icon={<Share2 size={18} />}
+              tooltip="Share playlist"
+            />
           </div>
         </div>
       </header>
@@ -282,31 +308,50 @@ export const PlaylistPage: React.FC = () => {
                 type="text"
                 value={customPlaylistName}
                 onChange={(e) => setCustomPlaylistName(e.target.value)}
-                className="text-2xl font-bold bg-transparent border-b border-gray-500 focus:border-blue-500 outline-none"
-                autoFocus
-                onBlur={() => setEditingName(false)}
+                className="text-2xl font-bold bg-transparent border-b-2 outline-none transition-all duration-200"
+                style={{
+                  borderColor: colors.border.secondary,
+                  color: colors.text.primary
+                }}
+                onFocus={(e) => e.target.style.borderColor = colors.border.focus}
+                onBlur={(e) => {
+                  setEditingName(false);
+                  e.target.style.borderColor = colors.border.secondary;
+                }}
                 onKeyDown={(e) => e.key === "Enter" && setEditingName(false)}
+                autoFocus
               />
             </div>
           ) : (
             <h1
-              className="text-2xl font-bold cursor-pointer hover:text-gray-300"
+              className="text-2xl font-bold cursor-pointer transition-all duration-200 hover:opacity-70"
+              style={{ color: colors.text.primary }}
               onClick={() => setEditingName(true)}
               title="Click to edit"
             >
               {customPlaylistName}
-              <span className="text-sm font-normal text-gray-400 ml-2">
+              <span 
+                className="text-sm font-normal ml-2"
+                style={{ color: colors.text.tertiary }}
+              >
                 (Click to edit)
               </span>
             </h1>
           )}
-          <p className="text-gray-400 mt-1">{playlist.length} tracks</p>
+          <p style={{ color: colors.text.secondary }} className="mt-1">{playlist.length} tracks</p>
         </div>
 
         {/* Playlist tracks */}
         {playlist.length > 0 ? (
-          <div className="bg-gray-800/50 rounded-xl overflow-hidden">
-            <ul className="divide-y divide-gray-700">
+          <div 
+            className="rounded-2xl overflow-hidden backdrop-blur-sm transition-all duration-300"
+            style={{
+              backgroundColor: `${colors.bg.elevated}60`,
+              border: `1px solid ${colors.border.primary}`,
+              boxShadow: `0 20px 60px ${colors.bg.overlay}15`
+            }}
+          >
+            <ul style={{ borderColor: colors.border.primary }} className="divide-y">
               {playlist.map((track: Song, index: number) => {
                 const enhancedTrack = enhancedPlaylist[index];
 
@@ -316,17 +361,38 @@ export const PlaylistPage: React.FC = () => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="p-3 md:p-4 flex items-center gap-3 hover:bg-gray-700/50"
+                    className="p-3 md:p-4 flex items-center gap-3 transition-all duration-200 hover:backdrop-blur-md"
+                    style={{
+                      background: 'transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = `${colors.interactive.hover}40`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
-                    <div className="w-8 text-center text-gray-400 font-medium">
+                    <div 
+                      className="w-8 text-center font-medium"
+                      style={{ color: colors.text.tertiary }}
+                    >
                       {index + 1}
                     </div>
-                    <div className="w-10 h-10 bg-gray-700 rounded-md flex items-center justify-center overflow-hidden">
+                    <div 
+                      className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden"
+                      style={{ backgroundColor: colors.bg.tertiary }}
+                    >
                       {enhancedTrack?.coverUrl ? (
                         <>
                           {loadingImages[index] && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
-                              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div 
+                              className="absolute inset-0 flex items-center justify-center"
+                              style={{ backgroundColor: colors.bg.tertiary }}
+                            >
+                              <div 
+                                className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
+                                style={{ borderColor: colors.brand.primary }}
+                              ></div>
                             </div>
                           )}
                           <img
@@ -339,96 +405,146 @@ export const PlaylistPage: React.FC = () => {
                           />
                         </>
                       ) : (
-                        <Music size={16} className="text-gray-400" />
+                        <Music size={16} style={{ color: colors.text.tertiary }} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{track.title}</p>
-                      <p className="text-sm text-gray-400 truncate">
+                      <p 
+                        className="font-medium truncate"
+                        style={{ color: colors.text.primary }}
+                      >
+                        {track.title}
+                      </p>
+                      <p 
+                        className="text-sm truncate"
+                        style={{ color: colors.text.secondary }}
+                      >
                         {track.artist}
                       </p>
                     </div>
-                    <button
-                      className="p-2 rounded-full hover:bg-gray-700"
+                    <Button
                       onClick={() => openSpotifySearch(track)}
-                      title="Search on Spotify"
-                    >
-                      <ExternalLink
-                        size={16}
-                        className="text-gray-400 hover:text-green-500"
-                      />
-                    </button>
-                    <button className="p-2 rounded-full hover:bg-gray-700">
-                      <Heart
-                        size={16}
-                        className="text-gray-400 hover:text-pink-500"
-                      />
-                    </button>
+                      variant="icon"
+                      size="sm"
+                      icon={
+                        <ExternalLink
+                          size={16}
+                          style={{ color: colors.text.tertiary }}
+                        />
+                      }
+                      tooltip="Search on Spotify"
+                    />
+                    <Button
+                      variant="icon"
+                      size="sm"
+                      icon={
+                        <Heart
+                          size={16}
+                          style={{ color: colors.text.tertiary }}
+                        />
+                      }
+                      tooltip="Like track (coming soon)"
+                      disabled
+                    />
                   </motion.li>
                 );
               })}
             </ul>
           </div>
         ) : (
-          <div className="text-center py-12 text-gray-400">
-            <Disc size={48} className="mx-auto mb-4 opacity-50" />
+          <div className="text-center py-12" style={{ color: colors.text.secondary }}>
+            <Disc size={48} className="mx-auto mb-4 opacity-50" style={{ color: colors.text.tertiary }} />
             <p>No tracks found. Try generating a new playlist.</p>
           </div>
         )}
 
         {/* Export to Spotify section */}
-        <div className="mt-8 bg-gray-800/50 rounded-xl p-6">
-          <h2 className="text-xl font-bold mb-4">Export to Spotify</h2>
+        <div 
+          className="mt-8 rounded-2xl p-6 backdrop-blur-sm transition-all duration-300"
+          style={{
+            backgroundColor: `${colors.bg.elevated}40`,
+            border: `1px solid ${colors.border.primary}`,
+            boxShadow: `0 20px 60px ${colors.bg.overlay}10`
+          }}
+        >
+          <h2 
+            className="text-xl font-bold mb-4"
+            style={{ color: colors.text.primary }}
+          >
+            Export to Spotify
+          </h2>
 
           {!exportedPlaylistURL ? (
             <>
               {isExporting ? (
                 <div className="space-y-4">
-                  <div className="w-full bg-gray-700 rounded-full h-2.5">
+                  <div 
+                    className="w-full rounded-full h-2.5"
+                    style={{ backgroundColor: colors.bg.tertiary }}
+                  >
                     <div
-                      className="bg-green-500 h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${exportProgress}%` }}
+                      className="h-2.5 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${exportProgress}%`,
+                        background: `linear-gradient(90deg, ${colors.status.success}, ${colors.brand.accent})`
+                      }}
                     ></div>
                   </div>
-                  <p className="text-gray-400">
+                  <p style={{ color: colors.text.secondary }}>
                     Searching for tracks... {exportProgress}%
                   </p>
                 </div>
               ) : (
-                <button
+                <Button
                   onClick={handleExportToSpotify}
-                  className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold transition-colors"
                   disabled={playlist.length === 0}
+                  variant="success"
+                  size="lg"
+                  fullWidth
+                  loading={isExporting}
+                  tooltip={playlist.length === 0 ? "No tracks to export" : "Export playlist to Spotify"}
+                  icon={
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="20"
+                      height="20"
+                      fill="currentColor"
+                    >
+                      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+                    </svg>
+                  }
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
-                  >
-                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-                  </svg>
-                  Export to Spotify
-                </button>
+                  Export
+                </Button>
               )}
             </>
           ) : (
             <div className="text-center">
-              <p className="text-green-500 mb-4">
+              <p 
+                className="mb-4 font-medium"
+                style={{ color: colors.status.success }}
+              >
                 ✓ Successfully exported to Spotify!
               </p>
-              <a
+              <Button
+                as="a"
                 href={exportedPlaylistURL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg font-bold transition-colors"
+                variant="success"
+                size="lg"
+                icon={<ExternalLink size={18} />}
+                tooltip="Open your playlist in Spotify"
               >
-                Open in Spotify
-              </a>
+                Open
+              </Button>
             </div>
           )}
 
-          <p className="text-gray-400 text-sm mt-4">
+          <p 
+            className="text-sm mt-4"
+            style={{ color: colors.text.secondary }}
+          >
             Note: Some songs may not be found on Spotify if they're very obscure
             or have different spellings in the database.
           </p>
@@ -436,12 +552,15 @@ export const PlaylistPage: React.FC = () => {
 
         {/* Generate another playlist */}
         <div className="mt-6 text-center">
-          <button
+          <Button
             onClick={() => navigate("/home")}
-            className="py-3 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors"
+            variant="primary"
+            size="lg"
+            icon={<Music size={18} />}
+            tooltip="Create a new playlist"
           >
-            Generate Another Playlist
-          </button>
+            New Playlist
+          </Button>
         </div>
       </main>
     </div>

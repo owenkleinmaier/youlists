@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAI } from "../actions/useAI";
 import { usePlaylistContext } from "../context/PlaylistContext";
+import { useTheme } from "../context/ThemeContext";
 import { motion } from "motion/react";
 
 const loadingPhrases = [
@@ -22,6 +23,7 @@ export const LoadingScreen: React.FC = () => {
   const location = useLocation();
   const { setCurrentPlaylist } = usePlaylistContext();
   const { generatePlaylist } = useAI();
+  const { colors } = useTheme();
   const { prompt, songCount, advancedParameters } = location.state || {};
   const [phrase, setPhrase] = useState(loadingPhrases[0]);
   const [phaseNumber, setPhaseNumber] = useState(1);
@@ -102,7 +104,13 @@ export const LoadingScreen: React.FC = () => {
   ]);
 
   return (
-    <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-900 to-black text-white p-8">
+    <div 
+      className="h-screen flex flex-col items-center justify-center p-8 transition-all duration-300"
+      style={{
+        background: `linear-gradient(135deg, ${colors.bg.primary} 0%, ${colors.bg.secondary} 50%, ${colors.bg.tertiary} 100%)`,
+        color: colors.text.primary
+      }}
+    >
       <div className="w-full max-w-md mx-auto text-center">
         <motion.div
           animate={{
@@ -116,8 +124,16 @@ export const LoadingScreen: React.FC = () => {
           }}
           className="mb-6"
         >
-          <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center">
-            <div className="w-20 h-20 rounded-full bg-black flex items-center justify-center">
+          <div 
+            className="w-24 h-24 mx-auto rounded-full flex items-center justify-center"
+            style={{
+              background: `linear-gradient(135deg, ${colors.brand.primary}, ${colors.brand.secondary})`
+            }}
+          >
+            <div 
+              className="w-20 h-20 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: colors.bg.primary }}
+            >
               <motion.div
                 animate={{
                   rotate: 360,
@@ -133,7 +149,7 @@ export const LoadingScreen: React.FC = () => {
                   viewBox="0 0 24 24"
                   className="w-full h-full"
                   fill="none"
-                  stroke="white"
+                  stroke={colors.text.primary}
                   strokeWidth="2"
                 >
                   <circle
@@ -143,17 +159,23 @@ export const LoadingScreen: React.FC = () => {
                     strokeDasharray="60"
                     strokeDashoffset="10"
                   />
-                  <circle cx="12" cy="12" r="4" fill="white" />
+                  <circle cx="12" cy="12" r="4" fill={colors.text.primary} />
                 </svg>
               </motion.div>
             </div>
           </div>
         </motion.div>
 
-        <h2 className="text-xl font-bold mb-2">
+        <h2 
+          className="text-xl font-bold mb-2"
+          style={{ color: colors.text.primary }}
+        >
           Phase {phaseNumber}: {phrase}
         </h2>
-        <p className="text-gray-400 mb-6">
+        <p 
+          className="mb-6"
+          style={{ color: colors.text.secondary }}
+        >
           Creating a {songCount}-song playlist for "
           {prompt && prompt.length > 30
             ? prompt.substring(0, 30) + "..."
@@ -161,13 +183,22 @@ export const LoadingScreen: React.FC = () => {
           "
         </p>
 
-        <div className="w-full bg-gray-700 rounded-full h-2.5 mb-2">
+        <div 
+          className="w-full rounded-full h-2.5 mb-2"
+          style={{ backgroundColor: colors.bg.tertiary }}
+        >
           <div
-            className="bg-gradient-to-r from-green-400 to-blue-500 h-2.5 rounded-full transition-all duration-300"
-            style={{ width: `${progress}%` }}
+            className="h-2.5 rounded-full transition-all duration-300"
+            style={{ 
+              width: `${progress}%`,
+              background: `linear-gradient(90deg, ${colors.brand.primary}, ${colors.brand.secondary})`
+            }}
           ></div>
         </div>
-        <p className="text-sm text-gray-400">
+        <p 
+          className="text-sm"
+          style={{ color: colors.text.secondary }}
+        >
           {Math.round(progress)}% complete
         </p>
       </div>
