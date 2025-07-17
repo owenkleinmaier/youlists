@@ -109,7 +109,20 @@ const HomePage: React.FC = () => {
               className="user-avatar"
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
-              {userInfo?.display_name?.[0]?.toLowerCase() || "u"}
+              {userInfo?.images?.[0]?.url ? (
+                <img
+                  src={userInfo.images[0].url}
+                  alt="Profile"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                userInfo?.display_name?.[0]?.toUpperCase() || "U"
+              )}
             </button>
 
             {showUserMenu && (
