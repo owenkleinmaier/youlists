@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Share2, ExternalLink, Sun, Moon } from "lucide-react";
 import { usePlaylistContext, Song } from "../context/PlaylistContext";
 import { usePlaylistHistory } from "../actions/usePlaylistHistory";
 import { useSpotify } from "../actions/useSpotify";
 import { useTheme } from "../context/ThemeContext";
+
+interface EnhancedSong extends Song {
+  coverUrl?: string;
+  previewUrl?: string;
+  popularity?: number;
+}
 
 const PlaylistPage: React.FC = () => {
   const navigate = useNavigate();
@@ -13,7 +19,12 @@ const PlaylistPage: React.FC = () => {
   const { playlistName, currentPlaylist } = usePlaylistContext();
   const { savePlaylist } = usePlaylistHistory();
   const token = localStorage.getItem("spotify_token");
-  const { searchTrackURI, createSpotifyPlaylist } = useSpotify(token);
+  const {
+    searchTrackURI,
+    getTrackDetails,
+    createSpotifyPlaylist,
+    enhancePlaylist,
+  } = useSpotify(token);
 
   const playlist = useMemo(() => {
     const playlistData = location.state?.playlistData || {
@@ -31,9 +42,51 @@ const PlaylistPage: React.FC = () => {
   const [customPlaylistName, setCustomPlaylistName] = useState(
     playlistName || "ai-generated playlist"
   );
+  const [enhancedPlaylist, setEnhancedPlaylist] = useState<EnhancedSong[]>([]);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  useEffect(() => {
+    const loadAlbumCovers = async () => {
+      if (playlist.length > 0 && token) {
+        setIsEnhancing(true);
+        try {
+          const enhanced = await Promise.all(
+            playlist.map(async (song) => {
+              try {
+                const uri = await searchTrackURI(song.title, song.artist);
+                if (uri) {
+                  const details = await getTrackDetails(uri);
+                  return {
+                    ...song,
+                    uri,
+                    coverUrl: details?.album.images[0]?.url,
+                    previewUrl: details?.preview_url,
+                    popularity: details?.popularity,
+                  };
+                }
+                return { ...song };
+              } catch (e) {
+                return { ...song };
+              }
+            })
+          );
+          setEnhancedPlaylist(enhanced);
+        } catch (error) {
+          console.error("Error enhancing playlist:", error);
+          setEnhancedPlaylist(playlist.map((song) => ({ ...song })));
+        } finally {
+          setIsEnhancing(false);
+        }
+      } else {
+        setEnhancedPlaylist(playlist.map((song) => ({ ...song })));
+      }
+    };
+
+    loadAlbumCovers();
+  }, [playlist, token, searchTrackURI, getTrackDetails]);
 
   const handleExportToSpotify = async () => {
-    if (!playlist.length) {
+    if (!enhancedPlaylist.length) {
       alert("No songs to export!");
       return;
     }
@@ -44,17 +97,26 @@ const PlaylistPage: React.FC = () => {
     try {
       const trackURIs: string[] = [];
 
-      for (let i = 0; i < playlist.length; i++) {
-        const song = playlist[i];
-        const uri = await searchTrackURI(song.title, song.artist);
-        if (uri) trackURIs.push(uri);
+      for (let i = 0; i < enhancedPlaylist.length; i++) {
+        const song = enhancedPlaylist[i];
 
-        setExportProgress(Math.round(((i + 1) / playlist.length) * 100));
+        if (song.uri) {
+          trackURIs.push(song.uri);
+        }
+
+        setExportProgress(
+          Math.round(((i + 1) / enhancedPlaylist.length) * 100)
+        );
+      }
+
+      if (trackURIs.length === 0) {
+        alert("No Spotify tracks found to export!");
+        return;
       }
 
       const playlistLink = await createSpotifyPlaylist(
         customPlaylistName,
-        trackURIs.filter(Boolean)
+        trackURIs
       );
 
       setExportedPlaylistURL(playlistLink);
@@ -67,7 +129,7 @@ const PlaylistPage: React.FC = () => {
   };
 
   const handleSaveToHistory = () => {
-    savePlaylist(customPlaylistName, playlist);
+    savePlaylist(customPlaylistName, enhancedPlaylist);
     setSavedToHistory(true);
 
     setTimeout(() => {
@@ -92,7 +154,7 @@ const PlaylistPage: React.FC = () => {
     }
   };
 
-  const openSpotifySearch = (song: Song) => {
+  const openSpotifySearch = (song: EnhancedSong) => {
     const query = `${song.title} ${song.artist}`;
     window.open(
       `https://open.spotify.com/search/${encodeURIComponent(query)}`,
@@ -139,21 +201,52 @@ const PlaylistPage: React.FC = () => {
             className="playlist-name-input"
             placeholder="playlist name..."
           />
-          <p className="playlist-info">{playlist.length} tracks</p>
+          <p className="playlist-info">
+            {enhancedPlaylist.length} tracks
+            {isEnhancing && " • loading album covers..."}
+          </p>
         </div>
 
-        {playlist.length > 0 ? (
+        {enhancedPlaylist.length > 0 ? (
           <div className="playlist-tracks">
-            {playlist.map((track: Song, index: number) => (
+            {enhancedPlaylist.map((track: EnhancedSong, index: number) => (
               <div
                 key={`${track.title}-${track.artist}-${index}`}
                 className="track-item"
               >
                 <span className="track-number">{index + 1}</span>
+
+                <div className="track-cover">
+                  {track.coverUrl ? (
+                    <img
+                      src={track.coverUrl}
+                      alt={`${track.title} album cover`}
+                      className="album-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="album-cover-placeholder">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M9 18V5l12-2v13"></path>
+                        <circle cx="6" cy="18" r="3"></circle>
+                        <circle cx="18" cy="16" r="3"></circle>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
                 <div className="track-info">
                   <div className="track-title">{track.title}</div>
                   <div className="track-artist">{track.artist}</div>
                 </div>
+
                 <button
                   className="track-action"
                   onClick={() => openSpotifySearch(track)}
@@ -200,7 +293,7 @@ const PlaylistPage: React.FC = () => {
                 <button
                   className="export-btn"
                   onClick={handleExportToSpotify}
-                  disabled={playlist.length === 0}
+                  disabled={enhancedPlaylist.length === 0}
                 >
                   export to spotify
                 </button>

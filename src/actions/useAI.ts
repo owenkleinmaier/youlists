@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Song } from "../context/PlaylistContext";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -12,13 +12,19 @@ export const useAI = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const activeRequestRef = useRef<Promise<PlaylistResponse | null> | null>(null);
+  
   const generatePlaylist = async (prompt: string, songCount: number = 15): Promise<PlaylistResponse | null> => {
+    if (activeRequestRef.current) {
+      return activeRequestRef.current;
+    }
+
     if (!OPENAI_API_KEY) {
-      console.error("❌ Missing OpenAI API Key!");
+      console.error("Missing OpenAI API Key!");
       setError("API Key missing. Please check your environment configuration.");
       return null;
     }
-
+    
     setIsLoading(true);
     setError(null);
 
@@ -51,75 +57,82 @@ export const useAI = () => {
       Do not include explanations or any extra text. Only return the JSON object.
     `;
 
-    try {
-      const messages = [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: `Generate a personalized playlist based on: "${prompt}".`
+    const requestPromise = (async (): Promise<PlaylistResponse | null> => {
+      try {
+        const messages = [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: `Generate a personalized playlist based on: "${prompt}".`
+          }
+        ];
+        
+        const response = await fetch(OPENAI_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4",
+            messages: messages,
+            max_tokens: 2000,
+            temperature: 0.7,
+            n: 1,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`OpenAI API Error: ${response.status} - ${errorText}`);
         }
-      ];
 
-      const response = await fetch(OPENAI_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4",
-          messages: messages,
-          max_tokens: 2000,
-          temperature: 0.7,
-          n: 1,
-        }),
-      });
+        const data = await response.json();
+        let content = data.choices[0]?.message?.content?.trim();
+        
+        content = content.replace(/^```json\s*|\s*```$/g, "");
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`❌ OpenAI API Error: ${response.status} - ${errorText}`);
-      }
+        const parsedResponse: PlaylistResponse = content ? JSON.parse(content) : null;
 
-      const data = await response.json();
-      let content = data.choices[0]?.message?.content?.trim();
-
-      content = content.replace(/^```json\s*|\s*```$/g, "");
-
-      const parsedResponse: PlaylistResponse = content ? JSON.parse(content) : null;
-
-      if (parsedResponse && Array.isArray(parsedResponse.playlist)) {
-        if (diversityMatch && parseInt(diversityMatch[1]) > 7) {
-          const seenArtists = new Set<string>();
-          const highDiversityPlaylist = parsedResponse.playlist.filter(song => {
-            const artistLower = song.artist.toLowerCase();
-            if (seenArtists.has(artistLower)) {
-              return false;
+        if (parsedResponse && Array.isArray(parsedResponse.playlist)) {
+          if (diversityMatch && parseInt(diversityMatch[1]) > 7) {
+            const seenArtists = new Set<string>();
+            const highDiversityPlaylist = parsedResponse.playlist.filter(song => {
+              const artistLower = song.artist.toLowerCase();
+              if (seenArtists.has(artistLower)) {
+                return false;
+              }
+              seenArtists.add(artistLower);
+              return true;
+            });
+            
+            if (highDiversityPlaylist.length >= Math.min(songCount * 0.8, songCount - 3)) {
+              parsedResponse.playlist = highDiversityPlaylist;
             }
-            seenArtists.add(artistLower);
-            return true;
-          });
+          }
           
-          if (highDiversityPlaylist.length >= Math.min(songCount * 0.8, songCount - 3)) {
-            parsedResponse.playlist = highDiversityPlaylist;
+          if (parsedResponse.playlist.length > songCount) {
+            parsedResponse.playlist = parsedResponse.playlist.slice(0, songCount);
           }
         }
-        
-        if (parsedResponse.playlist.length > songCount) {
-          parsedResponse.playlist = parsedResponse.playlist.slice(0, songCount);
-        }
-      }
 
-      return parsedResponse;
-    } catch (error) {
-      console.error("❌ Error generating playlist:", error);
-      setError(error instanceof Error ? error.message : "Unknown error occurred");
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
+        return parsedResponse;
+      } catch (error) {
+        console.error("Error generating playlist:", error);
+        setError(error instanceof Error ? error.message : "Unknown error occurred");
+        return null;
+      } finally {
+        setIsLoading(false);
+        activeRequestRef.current = null;
+      }
+    })();
+
+    activeRequestRef.current = requestPromise;
+    
+    return requestPromise;
   };
 
   return { generatePlaylist, isLoading, error };

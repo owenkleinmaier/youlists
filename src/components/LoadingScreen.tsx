@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Music } from "lucide-react";
 import { useAI } from "../actions/useAI";
@@ -21,75 +21,86 @@ const LoadingScreen: React.FC = () => {
   const { prompt, songCount, advancedParameters } = location.state || {};
 
   const [phrase, setPhrase] = useState(loadingPhrases[0]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+
+  const isGeneratingRef = useRef(false);
+  const hasStartedRef = useRef(false);
 
   useEffect(() => {
-    let phraseIndex = 0;
-    const phraseInterval = setInterval(() => {
-      phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
-      setPhrase(loadingPhrases[phraseIndex]);
-    }, 2000);
+    if (hasStartedRef.current || !prompt) {
+      return;
+    }
 
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        const increment = Math.random() * 15;
-        return Math.min(prev + increment, 95);
-      });
-    }, 1000);
+    hasStartedRef.current = true;
+
+    let phraseInterval: NodeJS.Timeout;
+
+    const startIntervals = () => {
+      let phraseIndex = 0;
+      phraseInterval = setInterval(() => {
+        phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
+        setPhrase(loadingPhrases[phraseIndex]);
+      }, 2000);
+    };
 
     const fetchPlaylist = async () => {
-      if (!isGenerating && prompt) {
-        setIsGenerating(true);
+      if (isGeneratingRef.current) {
+        return;
+      }
 
-        const enhancedPrompt = `
-          Generate a ${songCount}-song playlist based on: "${prompt}".
-          Energy level: ${advancedParameters.energyLevel}/10.
-          Tempo: ${advancedParameters.tempo}/10.
-          Artist diversity: ${advancedParameters.diversity}/10.
-          ${
-            advancedParameters.includeObscure
-              ? "Include some obscure/lesser-known tracks."
-              : "Focus on popular tracks."
-          }
-        `;
+      isGeneratingRef.current = true;
 
-        try {
-          const generatedPlaylist = await generatePlaylist(
-            enhancedPrompt,
-            songCount
-          );
-          setCurrentPlaylist(generatedPlaylist?.playlist || []);
-          setProgress(100);
+      const enhancedPrompt = `
+        Generate a ${songCount}-song playlist based on: "${prompt}".
+        Energy level: ${advancedParameters.energyLevel}/10.
+        Tempo: ${advancedParameters.tempo}/10.
+        Artist diversity: ${advancedParameters.diversity}/10.
+        ${
+          advancedParameters.includeObscure
+            ? "Include some obscure/lesser-known tracks."
+            : "Focus on popular tracks."
+        }
+      `;
+
+      try {
+        const generatedPlaylist = await generatePlaylist(
+          enhancedPrompt,
+          songCount
+        );
+
+        if (generatedPlaylist?.playlist) {
+          setCurrentPlaylist(generatedPlaylist.playlist);
+          setIsComplete(true);
 
           setTimeout(() => {
             navigate("/playlist", {
               state: { playlistData: generatedPlaylist },
+              replace: true,
             });
-          }, 500);
-        } catch (error) {
-          console.error("Error generating playlist:", error);
-          alert("Error generating playlist. Please try again.");
-          navigate("/home");
+          }, 800);
+        } else {
+          throw new Error("No playlist data received");
         }
+      } catch (error) {
+        console.error("Error generating playlist:", error);
+        alert("Error generating playlist. Please try again.");
+        navigate("/home", { replace: true });
       }
     };
 
+    startIntervals();
     fetchPlaylist();
 
     return () => {
-      clearInterval(phraseInterval);
-      clearInterval(progressInterval);
+      if (phraseInterval) clearInterval(phraseInterval);
     };
-  }, [
-    navigate,
-    generatePlaylist,
-    prompt,
-    songCount,
-    advancedParameters,
-    isGenerating,
-    setCurrentPlaylist,
-  ]);
+  }, []);
+
+  useEffect(() => {
+    if (!prompt && !hasStartedRef.current) {
+      navigate("/home", { replace: true });
+    }
+  }, [prompt, navigate]);
 
   return (
     <div className="page loading-page">
@@ -98,20 +109,22 @@ const LoadingScreen: React.FC = () => {
           <Music size={32} />
         </div>
 
-        <h2 className="loading-title">{phrase}</h2>
+        <h2 className="loading-title">
+          {isComplete ? "playlist ready!" : phrase}
+        </h2>
         <p className="loading-subtitle">
-          creating playlist for "
-          {prompt && prompt.length > 30
-            ? prompt.substring(0, 30) + "..."
-            : prompt}
-          "
+          {isComplete ? (
+            "redirecting to your playlist..."
+          ) : (
+            <>
+              creating playlist for "
+              {prompt && prompt.length > 30
+                ? prompt.substring(0, 30) + "..."
+                : prompt}
+              "
+            </>
+          )}
         </p>
-
-        <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${progress}%` }} />
-        </div>
-
-        <span className="progress-text">{Math.round(progress)}%</span>
       </div>
     </div>
   );

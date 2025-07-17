@@ -10,6 +10,7 @@ interface SpotifyTrack {
   album: {
     name: string;
     images: { url: string; height: number; width: number }[];
+    album_type: string;
   };
   preview_url: string | null;
   popularity: number;
@@ -19,32 +20,104 @@ export const useSpotify = (token: string | null) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isLiveOrRemixVersion = (trackName: string, albumName: string): boolean => {
+    const liveKeywords = [
+      'live', 'concert', 'tour', 'acoustic', 'unplugged', 'session',
+      'remix', 'edit', 'mix', 'version', 'remaster', 'demo', 'alternate',
+      'rehearsal', 'bootleg', 'radio', 'instrumental', 'karaoke'
+    ];
+    
+    const trackLower = trackName.toLowerCase();
+    const albumLower = albumName.toLowerCase();
+    
+    return liveKeywords.some(keyword => 
+      trackLower.includes(keyword) || albumLower.includes(keyword)
+    );
+  };
+
+  const calculateTrackScore = (track: SpotifyTrack, originalTitle: string, originalArtist: string): number => {
+    let score = 0;
+    
+    const trackNameLower = track.name.toLowerCase();
+    const originalTitleLower = originalTitle.toLowerCase();
+    const albumNameLower = track.album.name.toLowerCase();
+    
+    if (trackNameLower === originalTitleLower) {
+      score += 100;
+    } else if (trackNameLower.includes(originalTitleLower) || originalTitleLower.includes(trackNameLower)) {
+      score += 80;
+    }
+    
+    const hasMatchingArtist = track.artists.some(artist =>
+      artist.name.toLowerCase().includes(originalArtist.toLowerCase()) ||
+      originalArtist.toLowerCase().includes(artist.name.toLowerCase())
+    );
+    if (hasMatchingArtist) {
+      score += 80;
+    }
+    
+    score += Math.min(track.popularity, 100);
+    
+    if (track.album.album_type === 'album') {
+      score += 30;
+    } else if (track.album.album_type === 'single') {
+      score += 20;
+    }
+    
+    if (isLiveOrRemixVersion(track.name, track.album.name)) {
+      score -= 50;
+    }
+    
+    const parenthesesMatch = trackNameLower.match(/\([^)]*\)/g);
+    if (parenthesesMatch) {
+      score -= parenthesesMatch.length * 10;
+    }
+    
+    const bracketMatch = trackNameLower.match(/\[[^\]]*\]/g);
+    if (bracketMatch) {
+      score -= bracketMatch.length * 10;
+    }
+    
+    if (trackNameLower.includes('feat.') || trackNameLower.includes('ft.')) {
+      const originalHasFeat = originalTitleLower.includes('feat.') || originalTitleLower.includes('ft.');
+      if (!originalHasFeat) {
+        score -= 15;
+      }
+    }
+    
+    return score;
+  };
+
   const searchTrackURI = useCallback(
     async (trackName: string, artistName: string): Promise<string | null> => {
       if (!token) {
-        console.error("❌ Missing Spotify Token!");
+        console.error("Missing Spotify Token!");
         return null;
       }
+      
       try {
-        const query = `track:"${trackName.replace(/"/g, "")}" artist:"${artistName.replace(/"/g, "")}"`;
+        const cleanTrackName = trackName.replace(/[^\w\s]/g, ' ').trim();
+        const cleanArtistName = artistName.replace(/[^\w\s]/g, ' ').trim();
+        
+        const exactQuery = `track:"${cleanTrackName}" artist:"${cleanArtistName}"`;
         const response = await fetch(
-          `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(query)}&type=track&limit=5`,
+          `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(exactQuery)}&type=track&limit=20`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
 
         if (!response.ok) {
-          throw new Error(`❌ Spotify search failed: ${await response.text()}`);
+          throw new Error(`Spotify search failed: ${await response.text()}`);
         }
 
         const data = await response.json();
-        const tracks = data.tracks.items;
+        let tracks = data.tracks.items;
 
         if (tracks.length === 0) {
-          const relaxedQuery = `${trackName} ${artistName}`;
+          const fallbackQuery = `${cleanTrackName} ${cleanArtistName}`;
           const fallbackResponse = await fetch(
-            `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(relaxedQuery)}&type=track&limit=3`,
+            `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(fallbackQuery)}&type=track&limit=20`,
             {
               headers: { Authorization: `Bearer ${token}` },
             }
@@ -55,28 +128,23 @@ export const useSpotify = (token: string | null) => {
           }
 
           const fallbackData = await fallbackResponse.json();
-          return fallbackData.tracks.items[0]?.uri || null;
+          tracks = fallbackData.tracks.items;
         }
 
-        const bestMatch = tracks.reduce((best: SpotifyTrack | null, current: SpotifyTrack) => {
-          const hasMatchingArtist = current.artists.some(artist =>
-            artist.name.toLowerCase().includes(artistName.toLowerCase()) ||
-            artistName.toLowerCase().includes(artist.name.toLowerCase())
-          );
+        if (tracks.length === 0) {
+          return null;
+        }
 
-          const trackNameMatch =
-            current.name.toLowerCase().includes(trackName.toLowerCase()) ||
-            trackName.toLowerCase().includes(current.name.toLowerCase());
+        const scoredTracks = tracks.map((track: SpotifyTrack) => ({
+          track,
+          score: calculateTrackScore(track, trackName, artistName)
+        }));
 
-          if (!best || (hasMatchingArtist && trackNameMatch)) {
-            return current;
-          }
-          return best;
-        }, null);
+        scoredTracks.sort((a, b) => b.score - a.score);
 
-        return bestMatch?.uri || tracks[0]?.uri || null;
+        return scoredTracks[0]?.track?.uri || null;
       } catch (error) {
-        console.error("❌ Error searching for track:", error);
+        console.error("Error searching for track:", error);
         return null;
       }
     },
@@ -104,7 +172,7 @@ export const useSpotify = (token: string | null) => {
   const createSpotifyPlaylist = useCallback(
     async (playlistName: string, trackURIs: string[], description = "Generated by YouLists AI"): Promise<string | null> => {
       if (!token) {
-        console.error("❌ Missing Spotify Token!");
+        console.error("Missing Spotify Token!");
         setError("Missing Spotify authentication.");
         return null;
       }
@@ -165,7 +233,7 @@ export const useSpotify = (token: string | null) => {
 
         return playlistData.external_urls.spotify;
       } catch (error) {
-        console.error("❌ Error creating Spotify playlist:", error);
+        console.error("Error creating Spotify playlist:", error);
         setError(error instanceof Error ? error.message : "Unknown error occurred");
         return null;
       } finally {
