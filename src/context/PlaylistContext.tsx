@@ -1,4 +1,7 @@
+// src/context/PlaylistContext.tsx
+
 import React, { createContext, useState, useContext, ReactNode } from "react";
+import { ProcessedImage } from "../utils/imageUtils";
 
 interface PlaylistContextType {
   currentPlaylist: Song[] | null;
@@ -9,6 +12,8 @@ interface PlaylistContextType {
   setSongCount: (count: number) => void;
   advancedParameters: AdvancedParameters;
   setAdvancedParameters: (params: AdvancedParameters) => void;
+  selectedImage: ProcessedImage | null;
+  setSelectedImage: (image: ProcessedImage | null) => void;
 }
 
 export interface Song {
@@ -46,6 +51,9 @@ export const PlaylistProvider: React.FC<{ children: ReactNode }> = ({
   const [songCount, setSongCount] = useState<number>(15);
   const [advancedParameters, setAdvancedParameters] =
     useState<AdvancedParameters>(defaultAdvancedParameters);
+  const [selectedImage, setSelectedImage] = useState<ProcessedImage | null>(
+    null
+  );
 
   return (
     <PlaylistContext.Provider
@@ -58,6 +66,8 @@ export const PlaylistProvider: React.FC<{ children: ReactNode }> = ({
         setSongCount,
         advancedParameters,
         setAdvancedParameters,
+        selectedImage,
+        setSelectedImage,
       }}
     >
       {children}

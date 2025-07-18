@@ -1,8 +1,11 @@
+// src/components/LoadingScreen.tsx
+
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Music } from "lucide-react";
 import { useAI } from "../actions/useAI";
 import { usePlaylistContext } from "../context/PlaylistContext";
+import { ProcessedImage } from "../utils/imageUtils";
 
 const loadingPhrases = [
   "analyzing your request...",
@@ -13,21 +16,33 @@ const loadingPhrases = [
   "discovering hidden gems...",
 ];
 
+const imageLoadingPhrases = [
+  "analyzing your image...",
+  "extracting visual vibes...",
+  "interpreting the mood...",
+  "finding matching tracks...",
+  "curating your playlist...",
+  "almost ready...",
+];
+
 const LoadingScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setCurrentPlaylist } = usePlaylistContext();
+  const { setCurrentPlaylist, setPlaylistName } = usePlaylistContext();
   const { generatePlaylist } = useAI();
-  const { prompt, songCount, advancedParameters } = location.state || {};
+  const { prompt, songCount, advancedParameters, selectedImage } =
+    location.state || {};
 
-  const [phrase, setPhrase] = useState(loadingPhrases[0]);
+  const [phrase, setPhrase] = useState(
+    selectedImage ? imageLoadingPhrases[0] : loadingPhrases[0]
+  );
   const [isComplete, setIsComplete] = useState(false);
 
   const isGeneratingRef = useRef(false);
   const hasStartedRef = useRef(false);
 
   useEffect(() => {
-    if (hasStartedRef.current || !prompt) {
+    if (hasStartedRef.current || (!prompt && !selectedImage)) {
       return;
     }
 
@@ -36,10 +51,11 @@ const LoadingScreen: React.FC = () => {
     let phraseInterval: ReturnType<typeof setInterval>;
 
     const startIntervals = () => {
+      const phrases = selectedImage ? imageLoadingPhrases : loadingPhrases;
       let phraseIndex = 0;
       phraseInterval = setInterval(() => {
-        phraseIndex = (phraseIndex + 1) % loadingPhrases.length;
-        setPhrase(loadingPhrases[phraseIndex]);
+        phraseIndex = (phraseIndex + 1) % phrases.length;
+        setPhrase(phrases[phraseIndex]);
       }, 2000);
     };
 
@@ -65,16 +81,26 @@ const LoadingScreen: React.FC = () => {
       try {
         const generatedPlaylist = await generatePlaylist(
           enhancedPrompt,
-          songCount
+          songCount,
+          selectedImage as ProcessedImage | null
         );
 
         if (generatedPlaylist?.playlist) {
           setCurrentPlaylist(generatedPlaylist.playlist);
+
+          // Use generated title if no prompt was provided and we have one
+          if (!prompt && generatedPlaylist.generatedTitle) {
+            setPlaylistName(generatedPlaylist.generatedTitle);
+          }
+
           setIsComplete(true);
 
           setTimeout(() => {
             navigate("/playlist", {
-              state: { playlistData: generatedPlaylist },
+              state: {
+                playlistData: generatedPlaylist,
+                coverImage: selectedImage,
+              },
               replace: true,
             });
           }, 800);
@@ -97,10 +123,25 @@ const LoadingScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!prompt && !hasStartedRef.current) {
+    if (!prompt && !selectedImage && !hasStartedRef.current) {
       navigate("/home", { replace: true });
     }
-  }, [prompt, navigate]);
+  }, [prompt, selectedImage, navigate]);
+
+  const getDisplayText = () => {
+    if (selectedImage && prompt) {
+      return `creating playlist from image and "${
+        prompt.length > 30 ? prompt.substring(0, 30) + "..." : prompt
+      }"`;
+    } else if (selectedImage) {
+      return "creating playlist from your image";
+    } else if (prompt) {
+      return `creating playlist for "${
+        prompt.length > 30 ? prompt.substring(0, 30) + "..." : prompt
+      }"`;
+    }
+    return "creating your playlist";
+  };
 
   return (
     <div className="page loading-page">
@@ -113,17 +154,7 @@ const LoadingScreen: React.FC = () => {
           {isComplete ? "playlist ready!" : phrase}
         </h2>
         <p className="loading-subtitle">
-          {isComplete ? (
-            "redirecting to your playlist..."
-          ) : (
-            <>
-              creating playlist for "
-              {prompt && prompt.length > 30
-                ? prompt.substring(0, 30) + "..."
-                : prompt}
-              "
-            </>
-          )}
+          {isComplete ? "redirecting to your playlist..." : getDisplayText()}
         </p>
       </div>
     </div>

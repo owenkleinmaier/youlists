@@ -1,3 +1,5 @@
+// src/components/HomePage.tsx
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Settings, History, Sun, Moon } from "lucide-react";
@@ -6,6 +8,8 @@ import {
   usePlaylistContext,
   AdvancedParameters,
 } from "../context/PlaylistContext";
+import CompactImageUpload from "./CompactImageUpload";
+import { ProcessedImage } from "../utils/imageUtils";
 
 interface SpotifyUser {
   display_name: string;
@@ -21,6 +25,8 @@ const HomePage: React.FC = () => {
     setPlaylistName,
     advancedParameters,
     setAdvancedParameters,
+    selectedImage,
+    setSelectedImage,
   } = usePlaylistContext();
 
   const [userInfo, setUserInfo] = useState<SpotifyUser | null>(null);
@@ -80,14 +86,23 @@ const HomePage: React.FC = () => {
     }
   };
 
+  const handleImageSelect = (image: ProcessedImage | null) => {
+    setSelectedImage(image);
+  };
+
   const handleGeneratePlaylist = () => {
-    if (!prompt.trim()) {
+    // Check if we have either image or text
+    if (!selectedImage && !prompt.trim()) {
       return;
     }
 
-    const words = prompt.split(" ");
-    const playlistName =
-      words.length > 5 ? `${words.slice(0, 5).join(" ")}...` : prompt;
+    // Generate playlist name from prompt if available, otherwise it will be generated from AI
+    let playlistName = "ai-generated playlist";
+    if (prompt.trim()) {
+      const words = prompt.split(" ");
+      playlistName =
+        words.length > 5 ? `${words.slice(0, 5).join(" ")}...` : prompt;
+    }
     setPlaylistName(playlistName);
 
     navigate("/loading", {
@@ -95,9 +110,13 @@ const HomePage: React.FC = () => {
         prompt,
         songCount,
         advancedParameters,
+        selectedImage,
       },
     });
   };
+
+  // Check if we can generate (have image or text)
+  const canGenerate = selectedImage !== null || prompt.trim() !== "";
 
   return (
     <div className="page">
@@ -121,8 +140,16 @@ const HomePage: React.FC = () => {
             <button
               className="user-avatar"
               onClick={() => setShowUserMenu(!showUserMenu)}
+              style={{
+                backgroundImage: userInfo?.images?.[0]?.url
+                  ? `url(${userInfo.images[0].url})`
+                  : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                color: userInfo?.images?.[0]?.url ? "transparent" : undefined,
+              }}
             >
-              {userInfo?.display_name?.[0]?.toLowerCase() || "u"}
+              {!userInfo?.images?.[0]?.url && (userInfo?.display_name?.[0]?.toLowerCase() || "u")}
             </button>
 
             {showUserMenu && (
@@ -148,17 +175,33 @@ const HomePage: React.FC = () => {
         </div>
 
         <div className="playlist-form">
+          {/* Text Prompt Section with Image Upload */}
           <div className="form-group">
-            <textarea
-              className="prompt-input"
-              placeholder="e.g., upbeat indie rock for studying, chill jazz for a rainy day..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={3}
-            />
+            <div className="prompt-input-wrapper">
+              <textarea
+                className={`prompt-input ${
+                  selectedImage ? "with-image-btn" : ""
+                }`}
+                placeholder={
+                  selectedImage
+                    ? "describe additional preferences (optional - image will set the main vibe)"
+                    : "e.g., upbeat indie rock for studying, chill jazz for a rainy day..."
+                }
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={3}
+              />
+              <CompactImageUpload
+                onImageSelect={handleImageSelect}
+                selectedImage={selectedImage}
+                disabled={false}
+              />
+            </div>
           </div>
 
-          <div className="form-row">
+          <div
+            className={`form-row ${selectedImage ? "with-image-spacing" : ""}`}
+          >
             <div className="form-group">
               <label className="label">songs: {songCount}</label>
               <input
@@ -285,10 +328,10 @@ const HomePage: React.FC = () => {
           <button
             type="button"
             className="generate-btn"
-            disabled={!prompt.trim()}
+            disabled={!canGenerate}
             onClick={handleGeneratePlaylist}
           >
-            generate playlist
+            generate playlist{selectedImage ? " from image" : ""}
           </button>
         </div>
       </main>
