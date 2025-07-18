@@ -33,7 +33,7 @@ const LoadingScreen: React.FC = () => {
 
     hasStartedRef.current = true;
 
-    let phraseInterval: NodeJS.Timeout;
+    let phraseInterval: ReturnType<typeof setInterval>;
 
     const startIntervals = () => {
       let phraseIndex = 0;

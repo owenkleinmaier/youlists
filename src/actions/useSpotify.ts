@@ -40,7 +40,6 @@ export const useSpotify = (token: string | null) => {
     
     const trackNameLower = track.name.toLowerCase();
     const originalTitleLower = originalTitle.toLowerCase();
-    const albumNameLower = track.album.name.toLowerCase();
     
     if (trackNameLower === originalTitleLower) {
       score += 100;
@@ -140,7 +139,7 @@ export const useSpotify = (token: string | null) => {
           score: calculateTrackScore(track, trackName, artistName)
         }));
 
-        scoredTracks.sort((a, b) => b.score - a.score);
+        scoredTracks.sort((a: { score: number }, b: { score: number }) => b.score - a.score);
 
         return scoredTracks[0]?.track?.uri || null;
       } catch (error) {
