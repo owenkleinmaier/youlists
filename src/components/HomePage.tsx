@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, History, Sun, Moon } from "lucide-react";
+import { Settings, History, Sun, Moon, UserX } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import {
   usePlaylistContext,
@@ -33,10 +33,17 @@ const HomePage: React.FC = () => {
   const [prompt, setPrompt] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
 
   const token = localStorage.getItem("spotify_token");
+  const guestMode = localStorage.getItem("guest_mode");
 
   useEffect(() => {
+    if (guestMode === "true") {
+      setIsGuestMode(true);
+      return;
+    }
+
     if (token) {
       fetch("https://api.spotify.com/v1/me", {
         headers: { Authorization: `Bearer ${token}` },
@@ -56,10 +63,11 @@ const HomePage: React.FC = () => {
     } else {
       navigate("/");
     }
-  }, [token, navigate]);
+  }, [token, guestMode, navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem("spotify_token");
+    localStorage.removeItem("guest_mode");
     navigate("/");
   };
 
@@ -138,27 +146,27 @@ const HomePage: React.FC = () => {
 
           <div className="user-menu">
             <button
-              className="user-avatar"
+              className={`user-avatar ${isGuestMode ? "guest-avatar" : ""}`}
               onClick={() => setShowUserMenu(!showUserMenu)}
-              style={{
-                backgroundImage: userInfo?.images?.[0]?.url
-                  ? `url(${userInfo.images[0].url})`
-                  : undefined,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                color: userInfo?.images?.[0]?.url ? "transparent" : undefined,
-              }}
             >
-              {!userInfo?.images?.[0]?.url && (userInfo?.display_name?.[0]?.toLowerCase() || "u")}
+              {isGuestMode ? (
+                <UserX size={14} />
+              ) : (
+                userInfo?.display_name?.[0]?.toLowerCase() || "u"
+              )}
             </button>
 
             {showUserMenu && (
               <div className="user-dropdown">
                 <div className="user-info">
-                  <span>{userInfo?.display_name?.toLowerCase() || "user"}</span>
+                  <span>
+                    {isGuestMode
+                      ? "guest mode"
+                      : userInfo?.display_name?.toLowerCase() || "user"}
+                  </span>
                 </div>
                 <button className="dropdown-item" onClick={handleLogout}>
-                  logout
+                  {isGuestMode ? "switch to spotify" : "logout"}
                 </button>
               </div>
             )}

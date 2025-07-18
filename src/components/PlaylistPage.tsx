@@ -15,6 +15,8 @@ interface EnhancedSong extends Song {
   popularity?: number;
 }
 
+import UniversalExport from "./UniversalExport";
+
 const PlaylistPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,6 +24,7 @@ const PlaylistPage: React.FC = () => {
   const { playlistName, currentPlaylist } = usePlaylistContext();
   const { savePlaylist } = usePlaylistHistory();
   const token = localStorage.getItem("spotify_token");
+  const isGuestMode = localStorage.getItem("guest_mode") === "true";
   const { searchTrackURI, getTrackDetails, createSpotifyPlaylist } =
     useSpotify(token);
 
@@ -50,7 +53,7 @@ const PlaylistPage: React.FC = () => {
 
   useEffect(() => {
     const loadAlbumCovers = async () => {
-      if (playlist.length > 0 && token) {
+      if (playlist.length > 0 && token && !isGuestMode) {
         setIsEnhancing(true);
         try {
           const enhanced = await Promise.all(
@@ -294,63 +297,72 @@ const PlaylistPage: React.FC = () => {
         )}
 
         <div className="export-section">
-          {!exportedPlaylistURL ? (
+          {isGuestMode ? (
+            <UniversalExport
+              playlist={enhancedPlaylist}
+              playlistName={customPlaylistName}
+            />
+          ) : (
             <>
-              {isExporting ? (
-                <div style={{ marginBottom: "20px" }}>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${exportProgress}%` }}
-                    />
-                  </div>
+              {!exportedPlaylistURL ? (
+                <>
+                  {isExporting ? (
+                    <div style={{ marginBottom: "20px" }}>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${exportProgress}%` }}
+                        />
+                      </div>
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--text-secondary)",
+                          marginTop: "8px",
+                        }}
+                      >
+                        {exportProgress < 100
+                          ? `searching for tracks... ${exportProgress}%`
+                          : coverImage
+                          ? "uploading cover image..."
+                          : "finalizing playlist..."}
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      className="export-btn"
+                      onClick={handleExportToSpotify}
+                      disabled={enhancedPlaylist.length === 0}
+                    >
+                      export to spotify
+                      {coverImage && " with cover"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: "center" }}>
                   <p
                     style={{
-                      fontSize: "12px",
-                      color: "var(--text-secondary)",
-                      marginTop: "8px",
+                      color: "var(--accent-primary)",
+                      marginBottom: "16px",
+                      fontSize: "14px",
                     }}
                   >
-                    {exportProgress < 100
-                      ? `searching for tracks... ${exportProgress}%`
-                      : coverImage
-                      ? "uploading cover image..."
-                      : "finalizing playlist..."}
+                    ✓ successfully exported to spotify!
+                    {coverImage && " cover image included."}
                   </p>
+                  <a
+                    href={exportedPlaylistURL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="export-btn"
+                    style={{ textDecoration: "none", display: "inline-block" }}
+                  >
+                    open in spotify
+                  </a>
                 </div>
-              ) : (
-                <button
-                  className="export-btn"
-                  onClick={handleExportToSpotify}
-                  disabled={enhancedPlaylist.length === 0}
-                >
-                  export to spotify
-                  {coverImage && " with cover"}
-                </button>
               )}
             </>
-          ) : (
-            <div style={{ textAlign: "center" }}>
-              <p
-                style={{
-                  color: "var(--accent-primary)",
-                  marginBottom: "16px",
-                  fontSize: "14px",
-                }}
-              >
-                ✓ successfully exported to spotify!
-                {coverImage && " cover image included."}
-              </p>
-              <a
-                href={exportedPlaylistURL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="export-btn"
-                style={{ textDecoration: "none", display: "inline-block" }}
-              >
-                open in spotify
-              </a>
-            </div>
           )}
         </div>
       </main>
