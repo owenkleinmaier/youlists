@@ -22,6 +22,7 @@ export interface AdvancedParameters {
   energyLevel: number;
   tempo: number;
   diversity: number;
+  isUsed?: boolean;
 }
 
 const defaultAdvancedParameters: AdvancedParameters = {

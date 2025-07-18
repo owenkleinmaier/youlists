@@ -19,12 +19,8 @@ const PlaylistPage: React.FC = () => {
   const { playlistName, currentPlaylist } = usePlaylistContext();
   const { savePlaylist } = usePlaylistHistory();
   const token = localStorage.getItem("spotify_token");
-  const {
-    searchTrackURI,
-    getTrackDetails,
-    createSpotifyPlaylist,
-    enhancePlaylist,
-  } = useSpotify(token);
+  const { searchTrackURI, getTrackDetails, createSpotifyPlaylist } =
+    useSpotify(token);
 
   const playlist = useMemo(() => {
     const playlistData = location.state?.playlistData || {
@@ -51,7 +47,7 @@ const PlaylistPage: React.FC = () => {
         setIsEnhancing(true);
         try {
           const enhanced = await Promise.all(
-            playlist.map(async (song) => {
+            playlist.map(async (song: Song) => {
               try {
                 const uri = await searchTrackURI(song.title, song.artist);
                 if (uri) {
@@ -73,12 +69,12 @@ const PlaylistPage: React.FC = () => {
           setEnhancedPlaylist(enhanced);
         } catch (error) {
           console.error("Error enhancing playlist:", error);
-          setEnhancedPlaylist(playlist.map((song) => ({ ...song })));
+          setEnhancedPlaylist(playlist.map((song: Song) => ({ ...song })));
         } finally {
           setIsEnhancing(false);
         }
       } else {
-        setEnhancedPlaylist(playlist.map((song) => ({ ...song })));
+        setEnhancedPlaylist(playlist.map((song: Song) => ({ ...song })));
       }
     };
 

@@ -58,13 +58,26 @@ const HomePage: React.FC = () => {
   };
 
   const updateAdvancedParameter = (
-    param: keyof AdvancedParameters,
-    value: any
+    param: keyof Omit<AdvancedParameters, "isUsed">,
+    value: number | boolean
   ) => {
     setAdvancedParameters({
       ...advancedParameters,
       [param]: value,
+      isUsed: showAdvanced || advancedParameters.isUsed,
     });
+  };
+
+  const handleAdvancedToggle = () => {
+    const newShowAdvanced = !showAdvanced;
+    setShowAdvanced(newShowAdvanced);
+
+    if (newShowAdvanced) {
+      setAdvancedParameters({
+        ...advancedParameters,
+        isUsed: true,
+      });
+    }
   };
 
   const handleGeneratePlaylist = () => {
@@ -109,20 +122,7 @@ const HomePage: React.FC = () => {
               className="user-avatar"
               onClick={() => setShowUserMenu(!showUserMenu)}
             >
-              {userInfo?.images?.[0]?.url ? (
-                <img
-                  src={userInfo.images[0].url}
-                  alt="Profile"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "50%",
-                    objectFit: "cover",
-                  }}
-                />
-              ) : (
-                userInfo?.display_name?.[0]?.toUpperCase() || "U"
-              )}
+              {userInfo?.display_name?.[0]?.toLowerCase() || "u"}
             </button>
 
             {showUserMenu && (
@@ -179,7 +179,7 @@ const HomePage: React.FC = () => {
           <button
             type="button"
             className="advanced-toggle"
-            onClick={() => setShowAdvanced(!showAdvanced)}
+            onClick={handleAdvancedToggle}
           >
             advanced options {showAdvanced ? "−" : "+"}
           </button>
