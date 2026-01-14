@@ -4,8 +4,7 @@ import { useState, useRef } from "react";
 import { Song } from "../context/PlaylistContext";
 import { ProcessedImage } from "../utils/imageUtils";
 
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_API_KEY = import.meta.env.VITE_OPEN_AI_SECRET;
+const OPENAI_API_URL = "/api/openai";
 
 
 interface PlaylistResponse {
@@ -69,7 +68,6 @@ export const useAI = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
           model: "gpt-4o",
@@ -140,7 +138,6 @@ export const useAI = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
           model: "gpt-4",
