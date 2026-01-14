@@ -37,10 +37,6 @@ export const useAI = () => {
   };
 
   const analyzeImageVibe = async (image: ProcessedImage): Promise<string> => {
-    if (!OPENAI_API_KEY) {
-      throw new Error("OpenAI API key is missing");
-    }
-
     const imageAnalysisPrompt = `
       You are an expert music vibe interpreter analyzing images to understand the emotional atmosphere and mood they convey.
 
@@ -173,12 +169,6 @@ export const useAI = () => {
       return activeRequestRef.current;
     }
 
-    if (!OPENAI_API_KEY) {
-      console.error("Missing OpenAI API Key!");
-      setError("API Key missing. Please check your environment configuration.");
-      return null;
-    }
-
     // If no prompt and no image, can't generate
     if (!prompt.trim() && !image) {
       setError("Please provide either a text description or upload an image.");
@@ -230,7 +220,6 @@ export const useAI = () => {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${OPENAI_API_KEY}`,
               },
               body: JSON.stringify({
                 model: "gpt-4",
@@ -283,7 +272,6 @@ export const useAI = () => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${OPENAI_API_KEY}`,
             },
             body: JSON.stringify({
               model: "gpt-4",
@@ -343,7 +331,6 @@ export const useAI = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
           },
           body: JSON.stringify({
             model: "gpt-4",
