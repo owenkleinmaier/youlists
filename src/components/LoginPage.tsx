@@ -9,13 +9,33 @@ const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 const REDIRECT_URI =
   import.meta.env.VITE_REDIRECT_URI || window.location.origin;
 const AUTH_ENDPOINT = "https://accounts.spotify.com/authorize";
-const RESPONSE_TYPE = "token";
+const TOKEN_ENDPOINT = "https://accounts.spotify.com/api/token";
 const SCOPES = [
   "user-read-recently-played",
   "user-top-read",
   "playlist-modify-public",
   "playlist-modify-private",
-].join("%20");
+].join(" ");
+
+const generateCodeVerifier = (length: number) => {
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const values = crypto.getRandomValues(new Uint8Array(length));
+  return values.reduce((acc, x) => acc + possible[x % possible.length], "");
+};
+
+const sha256 = async (plain: string) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return window.crypto.subtle.digest("SHA-256", data);
+};
+
+const base64encode = (input: ArrayBuffer) => {
+  return btoa(String.fromCharCode(...new Uint8Array(input)))
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+};
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -23,25 +43,80 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash) {
-      const token = new URLSearchParams(hash.substring(1)).get("access_token");
-      if (token) {
-        window.localStorage.setItem("spotify_token", token);
-        setTimeout(() => navigate("/home"), 1000);
+    const handleCallback = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+
+      if (code) {
+        const codeVerifier = window.localStorage.getItem("code_verifier");
+
+        if (!codeVerifier) {
+          console.error("no code verifier found");
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const response = await fetch(TOKEN_ENDPOINT, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              client_id: CLIENT_ID!,
+              grant_type: "authorization_code",
+              code,
+              redirect_uri: REDIRECT_URI,
+              code_verifier: codeVerifier,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.access_token) {
+            window.localStorage.setItem("spotify_token", data.access_token);
+            window.localStorage.removeItem("code_verifier");
+            window.history.replaceState({}, document.title, "/");
+            setTimeout(() => navigate("/home"), 100);
+          } else {
+            console.error("no access token received", data);
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error("token exchange failed", error);
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    };
+
+    handleCallback();
   }, [navigate]);
 
-  const loginToSpotify = () => {
-    if (CLIENT_ID) {
-      window.location.href = `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${SCOPES}&response_type=${RESPONSE_TYPE}`;
-    } else {
+  const loginToSpotify = async () => {
+    if (!CLIENT_ID) {
       alert(
         "Spotify integration not configured. Please set up your Spotify app credentials."
       );
+      return;
     }
+
+    const codeVerifier = generateCodeVerifier(64);
+    window.localStorage.setItem("code_verifier", codeVerifier);
+
+    const hashed = await sha256(codeVerifier);
+    const codeChallenge = base64encode(hashed);
+
+    const authUrl = new URL(AUTH_ENDPOINT);
+    authUrl.searchParams.append("client_id", CLIENT_ID);
+    authUrl.searchParams.append("response_type", "code");
+    authUrl.searchParams.append("redirect_uri", REDIRECT_URI);
+    authUrl.searchParams.append("scope", SCOPES);
+    authUrl.searchParams.append("code_challenge_method", "S256");
+    authUrl.searchParams.append("code_challenge", codeChallenge);
+
+    window.location.href = authUrl.toString();
   };
 
   const continueWithoutSpotify = () => {
