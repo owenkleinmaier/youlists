@@ -20,6 +20,8 @@ const SettingsPage: React.FC = () => {
   const [localSongCount, setLocalSongCount] = useState(songCount);
   const token = localStorage.getItem("spotify_token");
 
+  const isGuestMode = localStorage.getItem("guest_mode") === "true";
+
   useEffect(() => {
     if (token) {
       fetch("https://api.spotify.com/v1/me", {
@@ -28,10 +30,10 @@ const SettingsPage: React.FC = () => {
         .then((response) => response.json())
         .then((data) => setUserInfo(data))
         .catch((error) => console.error("Error fetching user data:", error));
-    } else {
+    } else if (!isGuestMode) {
       navigate("/");
     }
-  }, [token, navigate]);
+  }, [token, isGuestMode, navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem("spotify_token");
@@ -318,7 +320,58 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* About */}
+          <div
+            style={{
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border-light)",
+              borderRadius: "6px",
+              padding: "20px",
+            }}
+          >
+            <h3
+              style={{
+                fontSize: "14px",
+                fontWeight: "500",
+                color: "var(--text-primary)",
+                marginBottom: "12px",
+              }}
+            >
+              keyboard shortcuts
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {[
+                { keys: "cmd/ctrl + enter", desc: "generate playlist (home)" },
+                { keys: "cmd/ctrl + s", desc: "save to history (playlist)" },
+                { keys: "cmd/ctrl + e", desc: "export to spotify (playlist)" },
+              ].map((shortcut) => (
+                <div
+                  key={shortcut.keys}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "12px",
+                  }}
+                >
+                  <span style={{ color: "var(--text-secondary)" }}>{shortcut.desc}</span>
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      background: "var(--bg-tertiary)",
+                      border: "1px solid var(--border-light)",
+                      borderRadius: "4px",
+                      fontSize: "10px",
+                      color: "var(--text-muted)",
+                      fontFamily: "'Noto Sans Mono', monospace",
+                    }}
+                  >
+                    {shortcut.keys}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div
             style={{
               background: "var(--bg-secondary)",
@@ -344,11 +397,10 @@ const SettingsPage: React.FC = () => {
                 marginBottom: "8px",
               }}
             >
-              version 2.0.0
+              version 2.1.0
             </p>
             <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-              created with ❤️ for music lovers. youlists uses ai to create
-              personalized playlists.
+              ai-powered playlists for your music taste.
             </p>
           </div>
         </div>

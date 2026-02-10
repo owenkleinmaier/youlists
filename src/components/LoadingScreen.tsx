@@ -1,11 +1,9 @@
-// src/components/LoadingScreen.tsx
-
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Music } from "lucide-react";
 import { useAI } from "../actions/useAI";
 import { usePlaylistContext } from "../context/PlaylistContext";
 import { ProcessedImage } from "../utils/imageUtils";
+import Logo from "./Logo";
 
 const loadingPhrases = [
   "analyzing your request...",
@@ -28,7 +26,7 @@ const imageLoadingPhrases = [
 const LoadingScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setCurrentPlaylist, setPlaylistName } = usePlaylistContext();
+  const { setCurrentPlaylist, setPlaylistName, setTags } = usePlaylistContext();
   const { generatePlaylist } = useAI();
   const { prompt, songCount, advancedParameters, selectedImage } =
     location.state || {};
@@ -87,8 +85,8 @@ const LoadingScreen: React.FC = () => {
 
         if (generatedPlaylist?.playlist) {
           setCurrentPlaylist(generatedPlaylist.playlist);
+          setTags(generatedPlaylist.tags || []);
 
-          // Use generated title if no prompt was provided and we have one
           if (!prompt && generatedPlaylist.generatedTitle) {
             setPlaylistName(generatedPlaylist.generatedTitle);
           }
@@ -146,8 +144,8 @@ const LoadingScreen: React.FC = () => {
   return (
     <div className="page loading-page">
       <div className="loading-content">
-        <div className="loading-spinner">
-          <Music size={32} />
+        <div className="loading-logo">
+          <Logo size="lg" showWordmark={false} animated />
         </div>
 
         <h2 className="loading-title">

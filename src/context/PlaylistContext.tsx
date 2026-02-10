@@ -1,5 +1,3 @@
-// src/context/PlaylistContext.tsx
-
 import React, { createContext, useState, useContext, ReactNode } from "react";
 import { ProcessedImage } from "../utils/imageUtils";
 
@@ -14,6 +12,10 @@ interface PlaylistContextType {
   setAdvancedParameters: (params: AdvancedParameters) => void;
   selectedImage: ProcessedImage | null;
   setSelectedImage: (image: ProcessedImage | null) => void;
+  tags: string[];
+  setTags: (tags: string[]) => void;
+  lastPrompt: string;
+  setLastPrompt: (prompt: string) => void;
 }
 
 export interface Song {
@@ -54,6 +56,8 @@ export const PlaylistProvider: React.FC<{ children: ReactNode }> = ({
   const [selectedImage, setSelectedImage] = useState<ProcessedImage | null>(
     null
   );
+  const [tags, setTags] = useState<string[]>([]);
+  const [lastPrompt, setLastPrompt] = useState<string>("");
 
   return (
     <PlaylistContext.Provider
@@ -68,6 +72,10 @@ export const PlaylistProvider: React.FC<{ children: ReactNode }> = ({
         setAdvancedParameters,
         selectedImage,
         setSelectedImage,
+        tags,
+        setTags,
+        lastPrompt,
+        setLastPrompt,
       }}
     >
       {children}

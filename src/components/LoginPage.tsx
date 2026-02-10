@@ -1,9 +1,8 @@
-// src/components/LoginPage.tsx - Simplified
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sun, Moon, Music } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import Logo from "./Logo";
 
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 const REDIRECT_URI =
@@ -128,9 +127,7 @@ const LoginPage = () => {
     return (
       <div className="page">
         <div className="login-container">
-          <div className="loading-spinner">
-            <Music size={24} />
-          </div>
+          <Logo size="md" showWordmark={false} animated />
         </div>
       </div>
     );
@@ -144,7 +141,7 @@ const LoginPage = () => {
 
       <div className="login-container">
         <div className="login-content">
-          <h1 className="login-title">youlists</h1>
+          <Logo size="xl" animated />
           <p className="login-subtitle">
             ai-powered playlists for your music taste
           </p>

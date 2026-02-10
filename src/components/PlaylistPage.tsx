@@ -1,27 +1,25 @@
-// src/components/PlaylistPage.tsx
-
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Share2, ExternalLink, Sun, Moon } from "lucide-react";
+import { ArrowLeft, Save, ExternalLink, Sun, Moon, RefreshCw, Download } from "lucide-react";
 import { usePlaylistContext, Song } from "../context/PlaylistContext";
 import { usePlaylistHistory } from "../actions/usePlaylistHistory";
 import { useSpotify } from "../actions/useSpotify";
 import { useTheme } from "../context/ThemeContext";
 import { ProcessedImage } from "../utils/imageUtils";
+import UniversalExport from "./UniversalExport";
 
 interface EnhancedSong extends Song {
   coverUrl?: string;
   previewUrl?: string;
   popularity?: number;
+  duration_ms?: number;
 }
-
-import UniversalExport from "./UniversalExport";
 
 const PlaylistPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const { playlistName, currentPlaylist } = usePlaylistContext();
+  const { playlistName, currentPlaylist, tags, lastPrompt, advancedParameters, songCount, selectedImage } = usePlaylistContext();
   const { savePlaylist } = usePlaylistHistory();
   const token = localStorage.getItem("spotify_token");
   const isGuestMode = localStorage.getItem("guest_mode") === "true";
@@ -68,6 +66,7 @@ const PlaylistPage: React.FC = () => {
                     coverUrl: details?.album.images[0]?.url,
                     previewUrl: details?.preview_url,
                     popularity: details?.popularity,
+                    duration_ms: (details as any)?.duration_ms,
                   };
                 }
                 return { ...song };
@@ -150,22 +149,123 @@ const PlaylistPage: React.FC = () => {
     }, 3000);
   };
 
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator
-        .share({
-          title: customPlaylistName,
-          text: `Check out my playlist: ${customPlaylistName}`,
-          url: window.location.href,
-        })
-        .catch((error) => console.error("Error sharing:", error));
-    } else {
-      navigator.clipboard
-        .writeText(window.location.href)
-        .then(() => alert("Link copied to clipboard!"))
-        .catch(() => alert("Failed to copy link"));
-    }
+  const handleRegenerate = () => {
+    navigate("/loading", {
+      state: {
+        prompt: lastPrompt,
+        songCount,
+        advancedParameters,
+        selectedImage,
+      },
+    });
   };
+
+  const getDurationEstimate = useCallback(() => {
+    if (enhancedPlaylist.length === 0) return "";
+    const totalMs = enhancedPlaylist.reduce((acc, t) => acc + (t.duration_ms || 210000), 0);
+    const totalMin = Math.round(totalMs / 60000);
+    return `~${totalMin} min`;
+  }, [enhancedPlaylist]);
+
+  const handleShareAsImage = async () => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const w = 600;
+    const h = 800;
+    canvas.width = w;
+    canvas.height = h;
+
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = "#3E7C59";
+    const barHeights = [26, 40, 52, 36, 46];
+    const barW = 6;
+    const barGap = 4;
+    const iconX = (w - (barW * 5 + barGap * 4)) / 2;
+    const iconY = 40;
+    barHeights.forEach((bh, i) => {
+      const x = iconX + i * (barW + barGap);
+      const y = iconY + (52 - bh);
+      ctx.beginPath();
+      ctx.roundRect(x, y, barW, bh, 3);
+      ctx.fill();
+    });
+
+    ctx.font = "500 24px 'Noto Sans Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffffff";
+    const wordY = iconY + 52 + 30;
+    const youWidth = ctx.measureText("you").width;
+    const listsWidth = ctx.measureText("lists").width;
+    const totalWidth = youWidth + listsWidth;
+    ctx.fillText("you", w / 2 - totalWidth / 2 + youWidth / 2, wordY);
+    ctx.fillStyle = "#3E7C59";
+    ctx.fillText("lists", w / 2 + totalWidth / 2 - listsWidth / 2, wordY);
+
+    ctx.font = "500 20px 'Noto Sans Mono', monospace";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    const name = customPlaylistName.length > 30 ? customPlaylistName.substring(0, 30) + "..." : customPlaylistName;
+    ctx.fillText(name, w / 2, wordY + 50);
+
+    if (tags.length > 0) {
+      ctx.font = "400 11px 'Noto Sans Mono', monospace";
+      ctx.fillStyle = "#3E7C59";
+      ctx.fillText(tags.join(" / "), w / 2, wordY + 75);
+    }
+
+    const tracksToShow = enhancedPlaylist.slice(0, 10);
+    ctx.textAlign = "left";
+    const startY = wordY + 110;
+    tracksToShow.forEach((track, i) => {
+      const y = startY + i * 40;
+      ctx.font = "400 12px 'Noto Sans Mono', monospace";
+      ctx.fillStyle = "#888888";
+      ctx.fillText(`${(i + 1).toString().padStart(2, "0")}`, 60, y);
+      ctx.font = "500 13px 'Noto Sans Mono', monospace";
+      ctx.fillStyle = "#ffffff";
+      const title = track.title.length > 28 ? track.title.substring(0, 28) + "..." : track.title;
+      ctx.fillText(title, 90, y);
+      ctx.font = "400 11px 'Noto Sans Mono', monospace";
+      ctx.fillStyle = "#888888";
+      const artist = track.artist.length > 30 ? track.artist.substring(0, 30) + "..." : track.artist;
+      ctx.fillText(artist, 90, y + 16);
+    });
+
+    ctx.font = "400 10px 'Noto Sans Mono', monospace";
+    ctx.fillStyle = "#888888";
+    ctx.textAlign = "center";
+    ctx.fillText("made with youlists", w / 2, h - 30);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${customPlaylistName.replace(/[^a-z0-9]/gi, "_")}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, "image/png");
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === "s") {
+          e.preventDefault();
+          handleSaveToHistory();
+        } else if (e.key === "e" && !isGuestMode) {
+          e.preventDefault();
+          handleExportToSpotify();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [enhancedPlaylist, customPlaylistName]);
 
   const openSpotifySearch = (song: EnhancedSong) => {
     const query = `${song.title} ${song.artist}`;
@@ -199,8 +299,8 @@ const PlaylistPage: React.FC = () => {
             <Save size={18} />
           </button>
 
-          <button className="icon-btn" onClick={handleShare}>
-            <Share2 size={18} />
+          <button className="icon-btn" onClick={handleShareAsImage} title="share as image">
+            <Download size={18} />
           </button>
         </div>
       </header>
@@ -221,18 +321,37 @@ const PlaylistPage: React.FC = () => {
             </div>
           )}
 
-          <input
-            type="text"
-            value={customPlaylistName}
-            onChange={(e) => setCustomPlaylistName(e.target.value)}
-            className="playlist-name-input"
-            placeholder="playlist name..."
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <input
+              type="text"
+              value={customPlaylistName}
+              onChange={(e) => setCustomPlaylistName(e.target.value)}
+              className="playlist-name-input"
+              placeholder="playlist name..."
+              style={{ marginBottom: 0 }}
+            />
+            <button
+              className="icon-btn"
+              onClick={handleRegenerate}
+              title="regenerate"
+              style={{ flexShrink: 0 }}
+            >
+              <RefreshCw size={16} />
+            </button>
+          </div>
           <p className="playlist-info">
-            {enhancedPlaylist.length} tracks
+            {enhancedPlaylist.length} tracks / {getDurationEstimate()}
             {isEnhancing && " • loading album covers..."}
             {coverImage && " • cover image ready"}
           </p>
+
+          {tags.length > 0 && (
+            <div className="playlist-tags">
+              {tags.map((tag) => (
+                <span key={tag} className="playlist-tag">{tag}</span>
+              ))}
+            </div>
+          )}
         </div>
 
         {enhancedPlaylist.length > 0 ? (

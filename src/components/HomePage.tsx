@@ -1,6 +1,4 @@
-// src/components/HomePage.tsx
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Settings, History, Sun, Moon, UserX } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
@@ -10,6 +8,7 @@ import {
 } from "../context/PlaylistContext";
 import CompactImageUpload from "./CompactImageUpload";
 import { ProcessedImage } from "../utils/imageUtils";
+import Logo from "./Logo";
 
 interface SpotifyUser {
   display_name: string;
@@ -27,6 +26,7 @@ const HomePage: React.FC = () => {
     setAdvancedParameters,
     selectedImage,
     setSelectedImage,
+    setLastPrompt,
   } = usePlaylistContext();
 
   const [userInfo, setUserInfo] = useState<SpotifyUser | null>(null);
@@ -34,6 +34,7 @@ const HomePage: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const token = localStorage.getItem("spotify_token");
   const guestMode = localStorage.getItem("guest_mode");
@@ -64,6 +65,19 @@ const HomePage: React.FC = () => {
       navigate("/");
     }
   }, [token, guestMode, navigate]);
+
+  useEffect(() => {
+    const hasSeen = localStorage.getItem("hasSeenOnboarding");
+    if (!hasSeen) {
+      const timer = setTimeout(() => setShowOnboarding(true), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const dismissOnboarding = () => {
+    setShowOnboarding(false);
+    localStorage.setItem("hasSeenOnboarding", "true");
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("spotify_token");
@@ -98,13 +112,13 @@ const HomePage: React.FC = () => {
     setSelectedImage(image);
   };
 
-  const handleGeneratePlaylist = () => {
-    // Check if we have either image or text
+  const canGenerate = selectedImage !== null || prompt.trim() !== "";
+
+  const handleGeneratePlaylist = useCallback(() => {
     if (!selectedImage && !prompt.trim()) {
       return;
     }
 
-    // Generate playlist name from prompt if available, otherwise it will be generated from AI
     let playlistName = "ai-generated playlist";
     if (prompt.trim()) {
       const words = prompt.split(" ");
@@ -112,6 +126,7 @@ const HomePage: React.FC = () => {
         words.length > 5 ? `${words.slice(0, 5).join(" ")}...` : prompt;
     }
     setPlaylistName(playlistName);
+    setLastPrompt(prompt);
 
     navigate("/loading", {
       state: {
@@ -121,15 +136,23 @@ const HomePage: React.FC = () => {
         selectedImage,
       },
     });
-  };
+  }, [selectedImage, prompt, songCount, advancedParameters, navigate, setPlaylistName, setLastPrompt]);
 
-  // Check if we can generate (have image or text)
-  const canGenerate = selectedImage !== null || prompt.trim() !== "";
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGenerate) {
+        e.preventDefault();
+        handleGeneratePlaylist();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [canGenerate, handleGeneratePlaylist]);
 
   return (
     <div className="page">
       <header className="header">
-        <h1 className="logo">youlists</h1>
+        <Logo size="sm" />
 
         <div className="header-actions">
           <button className="icon-btn" onClick={toggleTheme}>
@@ -342,6 +365,15 @@ const HomePage: React.FC = () => {
             generate playlist{selectedImage ? " from image" : ""}
           </button>
         </div>
+
+        {showOnboarding && (
+          <div className="onboarding-tooltip">
+            <span>new: upload an image to set the vibe</span>
+            <button className="onboarding-dismiss" onClick={dismissOnboarding}>
+              got it
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );

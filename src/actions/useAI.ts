@@ -1,5 +1,3 @@
-// src/actions/useAI.ts
-
 import { useState, useRef } from "react";
 import { Song } from "../context/PlaylistContext";
 import { ProcessedImage } from "../utils/imageUtils";
@@ -10,6 +8,7 @@ const OPENAI_API_URL = "/api/openai";
 interface PlaylistResponse {
   playlist: Song[];
   generatedTitle?: string;
+  tags?: string[];
 }
 
 export const useAI = () => {
@@ -322,8 +321,11 @@ export const useAI = () => {
           {
             "playlist": [
               { "title": "Song Name", "artist": "Artist Name" }
-            ]
+            ],
+            "tags": ["mood1", "mood2", "genre1", "genre2", "descriptor"]
           }
+
+          The "tags" array should contain 3-5 single-word lowercase tags describing the playlist mood, genre, or vibe. Examples: "indie", "melancholic", "acoustic", "90s", "driving", "ethereal", "upbeat".
         `;
 
         console.log("Generating playlist...");
@@ -357,7 +359,7 @@ export const useAI = () => {
         // Clean up JSON response
         content = content.replace(/^```json\s*|\s*```$/g, "");
         
-        let parsedResponse: { playlist: Song[] };
+        let parsedResponse: { playlist: Song[]; tags?: string[] };
         try {
           parsedResponse = JSON.parse(content);
         } catch (parseError) {
@@ -389,10 +391,15 @@ export const useAI = () => {
             parsedResponse.playlist = parsedResponse.playlist.slice(0, songCount);
           }
 
+          const tags = Array.isArray(parsedResponse.tags)
+            ? parsedResponse.tags.slice(0, 5).map(t => t.toLowerCase())
+            : [];
+
           console.log("Successfully generated playlist with", parsedResponse.playlist.length, "tracks");
           return {
             playlist: parsedResponse.playlist,
-            generatedTitle: generatedTitle || undefined
+            generatedTitle: generatedTitle || undefined,
+            tags,
           };
         }
 
