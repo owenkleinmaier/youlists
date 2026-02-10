@@ -14,6 +14,7 @@ const SCOPES = [
   "user-top-read",
   "playlist-modify-public",
   "playlist-modify-private",
+  "ugc-image-upload"
 ].join(" ");
 
 const generateCodeVerifier = (length: number) => {
