@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/openai.ts": {
+      "maxDuration": 60
+    }
+  }
+}
